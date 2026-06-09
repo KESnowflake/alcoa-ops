@@ -584,52 +584,57 @@ def fleet_fig():
 
 # ── SNOWFLAKE CORTEX HELPERS ──────────────────────────────────────────────────
 def _get_session():
+    errors = []
+    try:
+        conn = st.connection("snowflake")
+        return conn.session(), "st_connection", None
+    except Exception as e:
+        errors.append(f"st.connection: {e}")
     try:
         from snowflake.snowpark.context import get_active_session
-        return get_active_session(), "snowpark"
-    except Exception:
-        pass
+        return get_active_session(), "snowpark", None
+    except Exception as e:
+        errors.append(f"get_active_session: {e}")
     try:
         import snowflake.connector as _sf
         conn = _sf.connect(
             connection_name=os.getenv("SNOWFLAKE_CONNECTION_NAME") or "sfcogsops-snowhouse_aws_us_west_2"
         )
-        return conn, "connector"
-    except Exception:
-        pass
-    return None, None
+        return conn, "connector", None
+    except Exception as e:
+        errors.append(f"connector: {e}")
+    return None, None, " | ".join(errors)
 
 def cortex_complete(prompt: str) -> str:
-    session, mode = _get_session()
+    session, mode, err = _get_session()
     if session is None:
-        return (
-            "**Cortex AI is not available in this deployment.**\n\n"
-            "This feature requires a Snowflake connection. "
-            "You can still use the scenario sliders above to explore process impacts manually."
-        )
+        return f"**Cortex connection failed.**\n\nDebug: `{err}`"
     for model in ["claude-3-5-sonnet", "mistral-large2", "llama3.1-70b"]:
         try:
-            if mode == "snowpark":
+            if mode in ("st_connection", "snowpark"):
                 try:
                     from snowflake.cortex import Complete
                     result = Complete(model, prompt, session=session)
                     if result:
                         return str(result).strip()
                 except Exception:
-                    import json
-                    safe = prompt.replace("'", "''")
-                    row = session.sql(f"SELECT SNOWFLAKE.CORTEX.COMPLETE('{model}', '{safe}')").collect()
-                    if row and row[0][0]:
-                        return row[0][0].strip()
+                    pass
+                safe_m = model.replace("'","''")
+                safe_p = prompt.replace("'","''")
+                rows = session.sql(f"SELECT SNOWFLAKE.CORTEX.COMPLETE('{safe_m}','{safe_p}')").collect()
+                if rows and rows[0][0]:
+                    return rows[0][0].strip()
             else:
                 cur = session.cursor()
                 cur.execute("SELECT SNOWFLAKE.CORTEX.COMPLETE(%s, %s)", (model, prompt))
                 row = cur.fetchone()
                 if row and row[0]:
                     return row[0].strip()
-        except Exception:
+        except Exception as e:
+            if model == "llama3.1-70b":
+                return f"_All models failed. Last error: {e}_"
             continue
-    return "_Cortex AI unavailable — all models tried. Please check your Snowflake connection and permissions._"
+    return "_Cortex unavailable — check connection and CORTEX_USER privilege._"
 
 
 def parse_question(text: str):
