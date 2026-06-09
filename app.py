@@ -873,6 +873,18 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+def _interp_path(waypoints, prog):
+    import math
+    segs = [math.hypot(waypoints[i+1][0]-waypoints[i][0], waypoints[i+1][1]-waypoints[i][1]) for i in range(len(waypoints)-1)]
+    total = sum(segs); target = prog * total; cumul = 0
+    for i, sl in enumerate(segs):
+        if cumul + sl >= target:
+            lp = (target - cumul) / sl if sl > 0 else 0
+            return (waypoints[i][0] + (waypoints[i+1][0]-waypoints[i][0])*lp,
+                    waypoints[i][1] + (waypoints[i+1][1]-waypoints[i][1])*lp)
+        cumul += sl
+    return waypoints[-1]
+
 def _srng2(seed):
     s = [seed | 0]
     def _r():
@@ -1790,8 +1802,29 @@ elif "Train tracker" in page:
 
     slot = int(datetime.now().timestamp() / 30)
     ROUTES_T = {
-        "pinjarra": dict(oLat=PINJARRA_LAT, oLon=PINJARRA_LON, dLat=PORT_LAT, dLon=PORT_LON, dist_km=80, color=CYAN,  label="Pinjarra → Bunbury"),
-        "wagerup":  dict(oLat=WAGERUP_LAT,  oLon=WAGERUP_LON,  dLat=PORT_LAT, dLon=PORT_LON, dist_km=25, color=AMBER, label="Wagerup → Bunbury"),
+        "pinjarra": dict(
+            oLat=PINJARRA_LAT, oLon=PINJARRA_LON, dLat=PORT_LAT, dLon=PORT_LON,
+            dist_km=80, color=CYAN, label="Pinjarra → Bunbury",
+            waypoints=[
+                (-32.524, 115.963),
+                (-32.700, 115.940),
+                (-32.843, 115.917),
+                (-33.060, 115.900),
+                (-33.200, 115.860),
+                (-33.295, 115.760),
+                (-33.315, 115.678),
+                (-33.327, 115.637),
+            ]),
+        "wagerup": dict(
+            oLat=WAGERUP_LAT, oLon=WAGERUP_LON, dLat=PORT_LAT, dLon=PORT_LON,
+            dist_km=25, color=AMBER, label="Wagerup → Bunbury",
+            waypoints=[
+                (-33.304, 115.897),
+                (-33.302, 115.820),
+                (-33.308, 115.730),
+                (-33.318, 115.668),
+                (-33.327, 115.637),
+            ]),
     }
     TRAIN_CFGS = [
         ("PJR-001","pinjarra",101),("PJR-002","pinjarra",202),("PJR-003","pinjarra",303),
@@ -1802,8 +1835,7 @@ elif "Train tracker" in page:
     trains = []
     for tid, route_id, seed in TRAIN_CFGS:
         rd = ROUTES_T[route_id]; rng = _srng(seed, slot)
-        prog = rng(); lat = rd["oLat"] + (rd["dLat"]-rd["oLat"])*prog
-        lon  = rd["oLon"] + (rd["dLon"]-rd["oLon"])*prog
+        prog = rng(); lat, lon = _interp_path(rd["waypoints"], prog)
         r2   = rng()
         st_  = "Loading" if prog < 0.05 else "Unloading" if prog > 0.95 else ("Delayed" if r2 > 0.9 else "Running")
         spd  = 60 + rng()*20 if st_ == "Running" else 5 + rng()*15 if st_ == "Delayed" else 0
@@ -1827,8 +1859,9 @@ elif "Train tracker" in page:
 
     fig = go.Figure()
     for rid, rd in ROUTES_T.items():
+        wps = rd["waypoints"]
         fig.add_trace(go.Scattermapbox(
-            lat=[rd["oLat"],rd["dLat"]], lon=[rd["oLon"],rd["dLon"]],
+            lat=[w[0] for w in wps], lon=[w[1] for w in wps],
             mode="lines", line=dict(width=3,color=rd["color"]), opacity=0.7,
             hoverinfo="skip", showlegend=False))
     for name, lat, lon, col in [
@@ -1852,7 +1885,7 @@ elif "Train tracker" in page:
                 customdata=[[t["id"],t["status"],t["speed"],t["payload"],t["eta"],t["wagons"]] for t in rt],
                 hovertemplate="<b>🚂 %{customdata[0]}</b><br>Status: %{customdata[1]}<br>Speed: %{customdata[2]} km/h<br>Payload: %{customdata[3]} t<br>ETA: %{customdata[4]} min<extra></extra>"))
     fig.update_layout(**CHART_LAYOUT, height=460,
-                      mapbox=dict(style="carto-positron",
+                      mapbox=dict(style="open-street-map",
                                   center=dict(lat=-33.1, lon=115.76), zoom=8.5),
                       legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(13,33,55,0.85)"))
     st.plotly_chart(fig, use_container_width=True, config=dict(scrollZoom=True))
