@@ -2544,6 +2544,95 @@ elif "Environmental Advisor" in page:
             cd.markdown(f"<span style='color:{MUTED}'>limit: {e['limit']} {e['unit']}</span>",unsafe_allow_html=True)
             ce.markdown(f"<span style='background:{col}22;color:{col};padding:1px 8px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{sym} {e['status']}</span>",unsafe_allow_html=True)
 
+    st.markdown("---")
+    if st.button("📄 Generate Compliance Report", type="primary", use_container_width=False):
+        st.session_state["env_show_report"] = True
+
+    if st.session_state.get("env_show_report"):
+        report_date = datetime.now().strftime("%d %B %Y")
+        with st.container(border=True):
+            col_hdr, col_close = st.columns([8,1])
+            with col_close:
+                if st.button("✕ Close", key="env_close_report"):
+                    st.session_state["env_show_report"] = False
+                    st.rerun()
+            st.markdown(f"""
+<div style='text-align:center;margin-bottom:20px;'>
+  <div style='font-size:0.7rem;font-weight:700;color:{MUTED};letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;'>GOVERNMENT OF WESTERN AUSTRALIA</div>
+  <div style='font-size:1.3rem;font-weight:800;color:{TXT};'>Environmental Compliance Report</div>
+  <div style='font-size:0.8rem;color:{MUTED};margin-top:4px;'>Prepared under the <em>Mining Act 1978</em> (WA) s.70 &amp; <em>Environmental Protection Act 1986</em> (WA)</div>
+  <div style='font-size:0.78rem;color:{MUTED};margin-top:2px;'>Reporting period: May 2026 &nbsp;|&nbsp; Date generated: {report_date}</div>
+</div>
+<hr style='border-color:rgba(255,255,255,0.12);margin:0 0 16px 0;'/>
+""", unsafe_allow_html=True)
+
+            sections = [
+                ("1. Site Details", [
+                    ("Mine / operation",        "Huntly Bauxite Mine"),
+                    ("Operator",                "Alcoa of Australia Limited (ABN 37 004 966 270)"),
+                    ("DMIRS Mining Tenement",   "ML 1SA (Darling Range, Western Australia)"),
+                    ("DWER Environmental Licence","L8467/2004/10 (EP Act 1986 — s.58)"),
+                    ("EPA Assessment Number",   "EPA 1388"),
+                    ("Reporting officer",       "Environmental Advisor — Huntly Mine"),
+                    ("Submission due date",     "30 June 2026"),
+                ]),
+                ("2. EPA Licence Conditions — Performance Summary", [
+                    (e["param"], f"{e['current']} {e['unit']} (limit: {e['limit']} {e['unit']}) — {e['status']}") for e in EPA
+                ]),
+                ("3. Rehabilitation Performance", [
+                    ("Rehab area completed YTD",    f"{totalRehab} ha (target: {totalTarget} ha)"),
+                    ("Annual target",               "550 ha (DWER Licence Condition 12.3)"),
+                    ("2027 target",                 "1,000 ha/year"),
+                    ("Seed bank viability",         "Confirmed — moisture within optimal range (18.5%)"),
+                    ("Topsoil stockpile condition", "Satisfactory — 3 active stockpiles"),
+                ]),
+                ("4. Water Extraction", [
+                    ("Groundwater extraction MTD",      "484 ML (DWER Licence limit: 520 ML/month)"),
+                    ("Haul road water usage",           "~80% of total extraction (dust suppression)"),
+                    ("Water management plan version",   "WMP-HNT-2024-v3 (current)"),
+                ]),
+                ("5. Community Noise — EPA Licence Conditions", [
+                    ("Blast noise peak (month)",        "94 dBL (EPA limit: 115 dBL airblast)"),
+                    ("Ground vibration peak (month)",   "8.2 mm/s PPV (EPA limit: 20 mm/s)"),
+                    ("Community complaints received",   "0 (nil)"),
+                    ("Noise monitoring system",         "Instantel Micromate seismograph + MESA microphones"),
+                ]),
+                ("6. Incidents and Exceedances", [
+                    ("Total exceedances this period",   f"{exceedances} (PM10 haul road 62 µg/m³ on {report_date})"),
+                    ("Corrective action taken",         "Automated water cart dispatch — exceedance resolved within 45 min"),
+                    ("Notified to DWER",                "Yes — Pollution Incident Report PIR-2026-HNT-0047 lodged"),
+                    ("Fatalities / serious injuries",   "0 (nil)"),
+                ]),
+                ("7. Fauna and Flora Management", [
+                    ("Fauna detections this period",    "3 (Western pygmy possum, Carnaby's cockatoo, Dugite)"),
+                    ("Clearing suspended events",       "1 (Zone 5A — Western pygmy possum — 2h suspension)"),
+                    ("Clearing protocol compliance",    "Fully compliant — pre-clearing surveys current"),
+                    ("Threatened species triggers",     "Nil — no species of conservation significance impacted"),
+                ]),
+                ("8. Declaration", [
+                    ("Statement",       "I certify that the information contained in this report is true, accurate and complete to the best of my knowledge."),
+                    ("Signed by",       "__________________________________ (Environmental Advisor, Huntly Mine)"),
+                    ("Date",            report_date),
+                    ("Lodgement method","DWER Licensing Portal (dwer.wa.gov.au) + DMIRS MinePI"),
+                ]),
+            ]
+
+            for heading, rows in sections:
+                st.markdown(f"<div style='font-weight:700;color:{CYAN};font-size:0.88rem;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;margin:14px 0 8px 0;'>{heading}</div>", unsafe_allow_html=True)
+                for label, value in rows:
+                    ca, cb = st.columns([3, 6])
+                    ca.markdown(f"<span style='color:{MUTED};font-size:0.8rem;'>{label}</span>", unsafe_allow_html=True)
+                    cb.markdown(f"<span style='font-size:0.8rem;'>{value}</span>", unsafe_allow_html=True)
+
+            st.markdown(f"""
+<div style='text-align:center;margin-top:16px;padding:10px;background:rgba(0,87,168,0.1);border-radius:8px;border:1px solid rgba(0,87,168,0.3);font-size:0.73rem;color:{MUTED};'>
+  This report was auto-generated by the Alcoa Operations Control Platform.<br/>
+  Regulator contacts: <strong style='color:{TXT};'>DWER</strong> — dwer.wa.gov.au · (08) 6364 7000 &nbsp;|&nbsp;
+  <strong style='color:{TXT};'>DMIRS</strong> — dmirs.wa.gov.au · (08) 9358 8002 &nbsp;|&nbsp;
+  <strong style='color:{TXT};'>EPA WA</strong> — epa.wa.gov.au · (08) 6145 0800
+</div>
+""", unsafe_allow_html=True)
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  SAFETY / HSE MANAGER
 # ══════════════════════════════════════════════════════════════════════════════
