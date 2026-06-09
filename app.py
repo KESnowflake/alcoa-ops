@@ -825,16 +825,51 @@ with st.sidebar:
     <hr style="border-color:rgba(255,255,255,0.18); margin:0 0 16px 0;">
     """, unsafe_allow_html=True)
 
+    st.markdown("<div style='font-size:0.62rem;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,0.35);text-transform:uppercase;padding:2px 4px 2px 4px;'>Operations</div>", unsafe_allow_html=True)
     page = st.radio(
         "nav",
         [
             ":material/dashboard: Operations dashboard",
             ":material/science: Process simulator",
+        ],
+        label_visibility="collapsed",
+    )
+    st.markdown("<div style='font-size:0.62rem;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,0.35);text-transform:uppercase;padding:6px 4px 2px 4px;'>Logistics</div>", unsafe_allow_html=True)
+    page_log = st.radio(
+        "nav_log",
+        [
             ":material/gps_fixed: Vehicle tracker",
+            ":material/train: Train tracker",
             ":material/directions_boat: Ship tracker",
         ],
         label_visibility="collapsed",
     )
+    st.markdown("<div style='font-size:0.62rem;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,0.35);text-transform:uppercase;padding:6px 4px 2px 4px;'>Persona Dashboards</div>", unsafe_allow_html=True)
+    page_persona = st.radio(
+        "nav_persona",
+        [
+            ":material/clipboard_list: Production Superintendent",
+            ":material/map: Mine Planning Engineer",
+            ":material/biotech: Process / Met Engineer",
+            ":material/terrain: Geologist",
+            ":material/local_shipping: Maintenance — Mobile Fleet",
+            ":material/build: Reliability Engineer",
+            ":material/inventory_2: Supply Chain Planner",
+            ":material/anchor: Train / Port Coordinator",
+            ":material/shopping_cart: Procurement / Warehouse",
+            ":material/eco: Environmental Advisor",
+            ":material/security: Safety / HSE Manager",
+            ":material/bolt: Energy / Sustainability",
+        ],
+        label_visibility="collapsed",
+        index=None,
+    )
+    if page_log:
+        page = page_log
+        page_persona = None
+    if page_persona:
+        page = page_persona
+        page_log = None
 
     st.markdown("<hr style='border-color:rgba(255,255,255,0.18); margin:16px 0;'>", unsafe_allow_html=True)
     now = datetime.now()
@@ -1724,3 +1759,1794 @@ elif ":material/directions_boat:" in page:
             st.session_state["selected_ship"] = None
             st.rerun()
 
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PAGE 5 — TRAIN TRACKER
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/train:" in page:
+    PINJARRA_LAT, PINJARRA_LON = -32.524, 115.963
+    WAGERUP_LAT,  WAGERUP_LON  = -33.304, 115.897
+    PORT_LAT,     PORT_LON     = -33.327, 115.637
+
+    st.markdown(
+        "<h1 style='margin:0;font-size:1.75rem;'>Train Tracker</h1>"
+        "<p style='color:#94A3B8;margin:0 0 20px 0;'>Alumina rail movements — Pinjarra & Wagerup → Port of Bunbury (~2,100 t/train)</p>",
+        unsafe_allow_html=True,
+    )
+
+    def _srng(seed, slot):
+        s = [(seed + slot * 3) | 0]
+        def _r():
+            s[0] = (s[0] ^ (s[0] >> 15)) * (1 | s[0]) & 0xFFFFFFFF
+            s[0] = (s[0] ^ (s[0] + (s[0] ^ (s[0] >> 7)) * 61)) & 0xFFFFFFFF
+            return ((s[0] ^ (s[0] >> 14)) & 0xFFFFFFFF) / 4294967296
+        return _r
+
+    slot = int(datetime.now().timestamp() / 30)
+    ROUTES_T = {
+        "pinjarra": dict(oLat=PINJARRA_LAT, oLon=PINJARRA_LON, dLat=PORT_LAT, dLon=PORT_LON, dist_km=80, color=CYAN,  label="Pinjarra → Bunbury"),
+        "wagerup":  dict(oLat=WAGERUP_LAT,  oLon=WAGERUP_LON,  dLat=PORT_LAT, dLon=PORT_LON, dist_km=25, color=AMBER, label="Wagerup → Bunbury"),
+    }
+    TRAIN_CFGS = [
+        ("PJR-001","pinjarra",101),("PJR-002","pinjarra",202),("PJR-003","pinjarra",303),
+        ("WGR-001","wagerup",401),("WGR-002","wagerup",502),
+    ]
+    STATUS_TC = {"Running":GREEN,"Loading":CYAN,"Unloading":AMBER,"Delayed":RED}
+
+    trains = []
+    for tid, route_id, seed in TRAIN_CFGS:
+        rd = ROUTES_T[route_id]; rng = _srng(seed, slot)
+        prog = rng(); lat = rd["oLat"] + (rd["dLat"]-rd["oLat"])*prog
+        lon  = rd["oLon"] + (rd["dLon"]-rd["oLon"])*prog
+        r2   = rng()
+        st_  = "Loading" if prog < 0.05 else "Unloading" if prog > 0.95 else ("Delayed" if r2 > 0.9 else "Running")
+        spd  = 60 + rng()*20 if st_ == "Running" else 5 + rng()*15 if st_ == "Delayed" else 0
+        eta  = int((1-prog)*rd["dist_km"]/spd*60) if spd > 0 else 999
+        trains.append(dict(id=tid, route=route_id, lat=round(lat,5), lon=round(lon,5),
+                           status=st_, speed=round(spd), payload=round(1800+rng()*300),
+                           moisture=round((0.03+rng()*0.06)*1000)/1000,
+                           wagons=21+round(rng()*3), eta=eta))
+
+    running = sum(1 for t in trains if t["status"]=="Running")
+    delayed = sum(1 for t in trains if t["status"]=="Delayed")
+    payload = sum(t["payload"] for t in trains if t["status"] in ("Running","Delayed"))
+
+    c1,c2,c3,c4,c5,c6 = st.columns(6)
+    c1.metric("Trains running",     running,     border=True)
+    c2.metric("Delayed",            delayed,     border=True)
+    c3.metric("In-transit payload", f"{payload/1000:.1f}kt", border=True)
+    c4.metric("Pinjarra trains",    sum(1 for t in trains if t["route"]=="pinjarra"), border=True)
+    c5.metric("Wagerup trains",     sum(1 for t in trains if t["route"]=="wagerup"),  border=True)
+    c6.metric("Annual throughput",  "~6 Mtpa",   border=True)
+
+    esri = [dict(below="traces", sourcetype="raster",
+                 sourceattribution="Esri | National Geographic",
+                 source=["https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}"])]
+    fig = go.Figure()
+    for rid, rd in ROUTES_T.items():
+        fig.add_trace(go.Scattermapbox(
+            lat=[rd["oLat"],rd["dLat"]], lon=[rd["oLon"],rd["dLon"]],
+            mode="lines", line=dict(width=2.5,color=rd["color"]), opacity=0.45,
+            hoverinfo="skip", showlegend=False))
+    for name, lat, lon, sym in [
+        ("Pinjarra Refinery",PINJARRA_LAT,PINJARRA_LON,CYAN),
+        ("Wagerup Refinery",WAGERUP_LAT,WAGERUP_LON,AMBER),
+        ("Port of Bunbury",PORT_LAT,PORT_LON,GREEN)
+    ]:
+        fig.add_trace(go.Scattermapbox(
+            lat=[lat], lon=[lon], mode="markers+text",
+            marker=dict(size=18,color=sym),
+            text=["⚓" if "Port" in name else "🏭"],
+            hovertemplate=f"<b>{name}</b><extra></extra>",
+            textfont=dict(size=11,color="white"), showlegend=False))
+    for rid, rd in ROUTES_T.items():
+        rt = [t for t in trains if t["route"]==rid]
+        fig.add_trace(go.Scattermapbox(
+            lat=[t["lat"] for t in rt], lon=[t["lon"] for t in rt],
+            mode="markers", name=rd["label"],
+            marker=dict(size=16,color=[STATUS_TC[t["status"]] for t in rt],opacity=0.95),
+            customdata=[[t["id"],t["status"],t["speed"],t["payload"],t["eta"],t["wagons"]] for t in rt],
+            hovertemplate="<b>🚂 %{customdata[0]}</b><br>Status: %{customdata[1]}<br>Speed: %{customdata[2]} km/h<br>Payload: %{customdata[3]} t<br>ETA: %{customdata[4]} min<extra></extra>"))
+    fig.update_layout(**CHART_LAYOUT, height=460,
+                      mapbox=dict(style="white-bg", layers=esri, center=dict(lat=-33.1,lon=115.76), zoom=8.5),
+                      margin=dict(l=0,r=0,t=0,b=0),
+                      legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(13,33,55,0.85)"))
+    st.plotly_chart(fig, use_container_width=True, config=dict(scrollZoom=True))
+
+    cols = st.columns(5)
+    for i, t in enumerate(trains):
+        rd = ROUTES_T[t["route"]]
+        with cols[i % 5]:
+            with st.container(border=True):
+                sc = STATUS_TC[t["status"]]
+                st.markdown(f"**🚂 {t['id']}** &nbsp;<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:700;'>{t['status']}</span>", unsafe_allow_html=True)
+                st.markdown(f"<div style='font-size:0.72rem;color:{rd['color']};font-weight:600;'>{t['route'].capitalize()} Refinery</div>", unsafe_allow_html=True)
+                eta_str = "At terminal" if t['eta'] >= 999 else f"{t['eta']} min"
+                moist_flag = "⚠️" if t['moisture'] > 0.5 else "✓"
+                st.markdown(f"<div style='font-size:0.78rem;color:#94A3B8;line-height:1.9;'>📦 {t['payload']:,} t<br>⚡ {t['speed']} km/h · {t['wagons']} wagons<br>⏱ ETA: {eta_str}<br>💧 {t['moisture']}% {moist_flag}</div>", unsafe_allow_html=True)
+
+    st.caption("⏱ Auto-refreshes every 30s · Port of Bunbury: 3×50,000t storage bins · ~6 Mtpa annual throughput")
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PERSONA DASHBOARD HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+def _srng2(seed):
+    s = [seed | 0]
+    def _r():
+        s[0] = (s[0] ^ (s[0] >> 15)) * (1 | s[0]) & 0xFFFFFFFF
+        s[0] = (s[0] ^ (s[0] + (s[0] ^ (s[0] >> 7)) * 61)) & 0xFFFFFFFF
+        return ((s[0] ^ (s[0] >> 14)) & 0xFFFFFFFF) / 4294967296
+    return _r
+
+def _metrics(*items):
+    cols = st.columns(len(items))
+    for col, (label, value, delta) in zip(cols, items):
+        col.metric(label, value, delta, border=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PRODUCTION SUPERINTENDENT
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/clipboard_list:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Production Superintendent</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Morning briefing — overnight shift summary · Huntly Mine</p>", unsafe_allow_html=True)
+    r = _srng2(77)
+    now = datetime.now()
+    hrs12 = [now - timedelta(hours=11-i) for i in range(12)]
+    mined  = [round(1800 + r()*600) for _ in range(12)]
+    crusher= [round(v*(0.88+r()*0.08)) for v in mined]
+    futl   = [round(72 + r()*20) for _ in range(12)]
+
+    st.info("🤖 **AUTO-GENERATED 06:00 AWST** — Ready for 07:00 production meeting")
+    _metrics(
+        ("Tonnes mined (night)","19,120 t","▲ +720t vs plan"),
+        ("Fleet utilisation","87%","▲ +5% vs target"),
+        ("Crusher availability","91%","▼ −4% vs 95% target"),
+        ("Ore grade Al₂O₃","28.8%","▼ −0.6% vs model"),
+        ("Active incidents","0","✓ Clean shift"),
+        ("Env. exceedances","1","PM10 Monitor 3"),
+    )
+
+    c1,c2 = st.columns([2,1])
+    with c1:
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=hrs12,y=mined,  mode="lines",name="Tonnes mined/hr",line=dict(color=CYAN,width=2),fill="tozeroy",fillcolor="rgba(0,180,216,0.07)"))
+        fig.add_trace(go.Scatter(x=hrs12,y=crusher,mode="lines",name="Crusher output", line=dict(color=BLUE,width=2)))
+        fig.update_layout(**CHART_LAYOUT,height=220,title=dict(text="Overnight haulage & crusher (t/hr)",font=dict(color=TXT,size=13)),
+                          xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),
+                          legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fc=[GREEN if v>85 else AMBER if v>75 else RED for v in futl]
+        fig2=go.Figure(go.Bar(x=list(range(12)),y=futl,marker_color=fc))
+        fig2.update_layout(**CHART_LAYOUT,height=220,title=dict(text="Fleet utilisation %",font=dict(color=TXT,size=13)),
+                           xaxis=dict(**_ax(False),showticklabels=False),yaxis=dict(**_ax(),range=[0,105]),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+
+    with st.container(border=True):
+        st.markdown("**📊 Shift vs Plan**")
+        for label,plan,actual,unit in [
+            ("Tonnes mined",18400,19120,"t"),("Fleet utilisation",82,87,"%"),
+            ("Crusher availability",95,91,"%"),("Ore grade Al₂O₃",29.4,28.8,"%"),
+            ("Safety incidents",0,0,""),("Env. exceedances",0,1,""),
+        ]:
+            pct=actual/plan if plan>0 else 1
+            col=GREEN if actual>=plan else AMBER
+            status="Above plan" if actual>=plan else ("On plan" if actual==plan else "Below plan")
+            ca,cb,cc,cd=st.columns([3,2,2,2])
+            ca.markdown(label)
+            cb.markdown(f"<span style='color:{MUTED}'>Plan: {plan}{unit}</span>",unsafe_allow_html=True)
+            cc.markdown(f"<span style='color:{col};font-weight:700;'>Actual: {actual}{unit}</span>",unsafe_allow_html=True)
+            cd.markdown(f"<span style='background:{col}22;color:{col};padding:1px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{status}</span>",unsafe_allow_html=True)
+            st.progress(min(1.0,pct))
+
+    with st.container(border=True):
+        st.markdown("**⚡ Actions for Morning Meeting**")
+        for p,item,owner in [
+            ("🔴","Crusher 2 bearing alert — schedule maintenance window","Reliability"),
+            ("🟡","Haul road PM10 exceedance at Monitor 3 — water cart deployed","Environmental"),
+            ("🟡","Ore grade below model in Block 5A — notify Geologist","Mine Planning"),
+            ("🟢","Rail dispatch on schedule — 3 consists to Bunbury by 18:00","Train/Port"),
+            ("🟢","Caustic inventory confirmed — 8,200t in port storage","Supply Chain"),
+        ]:
+            ca,cb,cc=st.columns([0.5,8,2])
+            ca.markdown(p)
+            cb.markdown(item)
+            cc.markdown(f"<span style='color:{MUTED}'>→ {owner}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  MINE PLANNING ENGINEER
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/map:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Mine Planning Engineer</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Weekly mine plan · Block selection · Equipment availability — Huntly Mine</p>",unsafe_allow_html=True)
+    BLOCKS=[
+        dict(id="B-42A",al2o3=38.2,rsi=2.1,dist=0.8,area=4.2,status="Cleared", equip="Available",approved=True),
+        dict(id="B-42B",al2o3=36.8,rsi=2.8,dist=1.1,area=3.8,status="Cleared", equip="Available",approved=True),
+        dict(id="B-43A",al2o3=34.1,rsi=3.4,dist=1.6,area=5.1,status="Cleared", equip="Partial",  approved=True),
+        dict(id="B-43B",al2o3=39.4,rsi=1.9,dist=2.2,area=4.7,status="Drilled", equip="Available",approved=False),
+        dict(id="B-44A",al2o3=37.6,rsi=2.3,dist=2.8,area=3.3,status="Planned", equip="Available",approved=True),
+        dict(id="B-44B",al2o3=32.4,rsi=4.1,dist=3.4,area=6.0,status="Planned", equip="Partial",  approved=False),
+        dict(id="B-45A",al2o3=40.1,rsi=1.7,dist=1.4,area=4.9,status="Cleared", equip="Available",approved=True),
+        dict(id="B-45B",al2o3=35.5,rsi=2.6,dist=1.8,area=3.6,status="Cleared", equip="Available",approved=True),
+    ]
+    qual=[b for b in BLOCKS if b["al2o3"]>=35 and b["dist"]<=2 and b["approved"]]
+    avg_g=sum(b["al2o3"] for b in qual)/len(qual) if qual else 0
+    _metrics(
+        (f"Qualified blocks",len(qual),"Ready to schedule"),
+        ("Avg Al₂O₃ (qualified)",f"{avg_g:.1f}%","vs 29% overall avg"),
+        ("Refinery feed target","620 t/hr","Pinjarra digestion demand"),
+        ("Clearing approvals due","2 blocks","DMIRS pending — B-43B, B-44B"),
+        ("Plan prep time saved","70%","2 days → 0.5 day (CoCo)"),
+    )
+    c1,c2=st.columns(2)
+    with c1:
+        colors=[GREEN if b["al2o3"]>=35 and b["dist"]<=2 and b["approved"] else AMBER if b["al2o3"]>=35 else RED for b in BLOCKS]
+        fig=go.Figure(go.Scatter(x=[b["dist"] for b in BLOCKS],y=[b["al2o3"] for b in BLOCKS],
+                                   mode="markers",marker=dict(size=[b["area"]*8 for b in BLOCKS],color=colors,opacity=0.85),
+                                   text=[b["id"] for b in BLOCKS],
+                                   hovertemplate="<b>%{text}</b><br>Al₂O₃: %{y:.1f}%<br>Distance: %{x:.1f} km<extra></extra>"))
+        fig.add_hline(y=35,line_dash="dash",line_color=AMBER,line_width=1.5)
+        fig.add_vline(x=2, line_dash="dash",line_color=AMBER,line_width=1.5)
+        fig.update_layout(**CHART_LAYOUT,height=260,title=dict(text="Block grade vs distance (bubble = area ha)",font=dict(color=TXT,size=13)),
+                          xaxis=dict(**_ax(),title=dict(text="Distance from crusher (km)",font=dict(color=MUTED,size=10))),
+                          yaxis=dict(**_ax(),title=dict(text="Al₂O₃ grade (%)",font=dict(color=MUTED,size=10))),showlegend=False)
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        ids=[b["id"] for b in BLOCKS]
+        fig2=go.Figure()
+        fig2.add_trace(go.Bar(name="Al₂O₃ %",x=ids,y=[b["al2o3"] for b in BLOCKS],marker_color=[GREEN if b["al2o3"]>=35 else AMBER for b in BLOCKS]))
+        fig2.add_trace(go.Bar(name="RSi %×5",x=ids,y=[b["rsi"]*5 for b in BLOCKS], marker_color=[RED if b["rsi"]>3 else AMBER for b in BLOCKS],opacity=0.7))
+        fig2.update_layout(**CHART_LAYOUT,barmode="group",height=260,title=dict(text="Block grade — Al₂O₃ vs reactive silica",font=dict(color=TXT,size=13)),
+                           xaxis=_ax(False),yaxis=_ax(),legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**📋 Block schedule — next 7 days**")
+        for b in BLOCKS:
+            sc=GREEN if b["status"]=="Cleared" else CYAN if b["status"]=="Drilled" else AMBER
+            ca,cb,cc,cd,ce,cf,cg,ch=st.columns([1,1,1,1,1,1.2,1,1])
+            ca.markdown(f"**{b['id']}**")
+            cb.markdown(f"<span style='color:{CYAN}'>{b['al2o3']}%</span>",unsafe_allow_html=True)
+            cc.markdown(f"<span style='color:{RED if b['rsi']>3 else MUTED}'>RSi {b['rsi']}%</span>",unsafe_allow_html=True)
+            cd.markdown(f"<span style='color:{MUTED}'>{b['dist']} km</span>",unsafe_allow_html=True)
+            ce.markdown(f"<span style='color:{MUTED}'>{b['area']} ha</span>",unsafe_allow_html=True)
+            cf.markdown(f"<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{b['status']}</span>",unsafe_allow_html=True)
+            cg.markdown(f"<span style='color:{GREEN if b['equip']=='Available' else AMBER}'>{b['equip']}</span>",unsafe_allow_html=True)
+            ch.markdown(f"<span style='color:{GREEN if b['approved'] else RED}'>{'✓ Approved' if b['approved'] else '⚠ Pending'}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PROCESS / MET ENGINEER
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/biotech:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Process / Metallurgical Engineer</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Bayer Process optimisation — ore grade correlation · LIMS vs DCS historian · Digestion parameters</p>",unsafe_allow_html=True)
+    r=_srng2(55); now=datetime.now()
+    hrs24=[now-timedelta(hours=23-i) for i in range(24)]
+    turb=[max(4,min(28,12+(r()-0.5)*8)) for _ in range(24)]
+    rsi_f=[round((2.4+(r()-0.5)*1.2)*10)/10 for _ in range(24)]
+    al2=[round((91+(r()-0.5)*3)*10)/10 for _ in range(24)]
+    r2=_srng2(66)
+    cx=[round((1.5+r2()*3)*10)/10 for _ in range(20)]
+    cy=[round((8+r2()*18)*10)/10 for _ in range(20)]
+    _metrics(
+        ("Al₂O₃ extraction","91.2%","▲ Above 90% target"),
+        ("Reactive silica (feed)","2.8%","⚠ Trending up from 2.1%"),
+        ("Turbidity (overflow)","14.2 NTU","↑ from 12 NTU baseline"),
+        ("Caustic efficiency","94.1%","✓ Normal range"),
+        ("Analysis time saved","80%","6 hrs → 1 hr (CoCo)"),
+    )
+    c1,c2,c3=st.columns(3)
+    with c1:
+        fig=go.Figure(go.Scatter(x=cx,y=cy,mode="markers",marker=dict(size=8,color=CYAN,opacity=0.8),
+                                   hovertemplate="RSi: %{x}%<br>Turbidity: %{y} NTU<extra></extra>"))
+        fig.update_layout(**CHART_LAYOUT,height=235,title=dict(text="RSi in feed vs clarifier turbidity (r=0.82)",font=dict(color=TXT,size=12)),
+                          xaxis=dict(**_ax(),title=dict(text="Reactive silica % in feed",font=dict(color=MUTED,size=10))),
+                          yaxis=dict(**_ax(),title=dict(text="Turbidity (NTU)",font=dict(color=MUTED,size=10))),showlegend=False)
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure(go.Scatter(x=hrs24,y=turb,mode="lines",line=dict(color=AMBER,width=2),fill="tozeroy",fillcolor="rgba(245,158,11,0.08)"))
+        fig2.add_hline(y=20,line_dash="dash",line_color=RED,line_width=1.5)
+        fig2.update_layout(**CHART_LAYOUT,height=235,title=dict(text="Clarifier turbidity — 24h trend",font=dict(color=TXT,size=12)),
+                           xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with c3:
+        fig3=go.Figure()
+        fig3.add_trace(go.Scatter(x=hrs24,y=al2,mode="lines",name="Al₂O₃ extraction %",line=dict(color=GREEN,width=2)))
+        fig3.add_trace(go.Scatter(x=hrs24,y=rsi_f,mode="lines",name="RSi feed %",yaxis="y2",line=dict(color=RED,width=1.5,dash="dot")))
+        fig3.update_layout(**CHART_LAYOUT,height=235,title=dict(text="Al₂O₃ extraction vs reactive silica",font=dict(color=TXT,size=12)),
+                           xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),
+                           yaxis2=dict(overlaying="y",side="right",tickfont=dict(color=MUTED,size=9),showgrid=False),
+                           legend=dict(font=dict(color=TXT,size=10),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig3,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**🤖 AI Parameter Recommendations**")
+        for param,current,rec,reason,impact in [
+            ("Digestion temperature","145°C","147°C","RSi 3.1% in feed — increase temp to maintain extraction","+0.8% Al₂O₃"),
+            ("Caustic concentration","235 g/L","240 g/L","Elevated reactive silica depleting NaOH faster than nominal","Maintains >90% extraction"),
+            ("Flocculant dose","45 g/t","52 g/t","Turbidity trending up — increase to maintain clarity spec","Turbidity <15 NTU"),
+        ]:
+            with st.container(border=True):
+                ca,cb,cc,cd=st.columns([2,1.5,1.5,2])
+                ca.markdown(f"**{param}**")
+                cb.markdown(f"Current: **{current}**")
+                cc.markdown(f"→ Rec: <span style='color:{GREEN};font-weight:700;'>{rec}</span>",unsafe_allow_html=True)
+                cd.markdown(f"<span style='background:rgba(16,185,129,0.15);color:{GREEN};padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{impact}</span>",unsafe_allow_html=True)
+                st.caption(reason)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  GEOLOGIST
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/terrain:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Geologist / Resource Modeller</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Block model grade reconciliation · F1/F2/F3 accuracy · Mine-to-mill tracking — Huntly Mine</p>",unsafe_allow_html=True)
+    GBLOCKS=[
+        dict(id="B-42A",pred=38.4,bh=38.2,crush=37.8,ref=37.1,pred_rsi=2.0,bh_rsi=2.1,f1=0.995,f2=0.983,f3=0.967),
+        dict(id="B-42B",pred=36.5,bh=36.8,crush=36.2,ref=35.7,pred_rsi=2.9,bh_rsi=2.8,f1=1.008,f2=0.993,f3=0.978),
+        dict(id="B-43A",pred=34.8,bh=34.1,crush=33.5,ref=32.9,pred_rsi=3.2,bh_rsi=3.4,f1=0.980,f2=0.963,f3=0.945),
+        dict(id="B-43B",pred=40.1,bh=39.4,crush=38.8,ref=38.1,pred_rsi=1.8,bh_rsi=1.9,f1=0.983,f2=0.967,f3=0.950),
+        dict(id="B-45A",pred=38.0,bh=40.1,crush=39.4,ref=38.6,pred_rsi=2.2,bh_rsi=1.7,f1=1.055,f2=1.037,f3=1.016),
+        dict(id="B-45B",pred=35.2,bh=35.5,crush=34.9,ref=34.3,pred_rsi=2.5,bh_rsi=2.6,f1=1.009,f2=0.991,f3=0.974),
+    ]
+    ids=[b["id"] for b in GBLOCKS]
+    avg_f1=sum(b["f1"] for b in GBLOCKS)/len(GBLOCKS)
+    flagged=sum(1 for b in GBLOCKS if abs(b["f1"]-1)>0.03)
+    qtrs=["Q3 2025","Q4 2025","Q1 2026","Q2 2026"]
+    _metrics(
+        ("Avg model F1 factor",f"{avg_f1:.3f}","F1=1.000 = perfect"),
+        ("Blocks flagged",flagged,"|F1−1.0| >3% = systematic bias"),
+        ("Reconciliation cycle","1.5 days","70% faster vs 5-day manual"),
+        ("Active drill blocks","6","Current quarter schedule"),
+    )
+    c1,c2=st.columns(2)
+    with c1:
+        fig=go.Figure()
+        for ys,nm,col in [([b["pred"] for b in GBLOCKS],"Predicted",MUTED),
+                           ([b["bh"] for b in GBLOCKS],"Blast-hole",CYAN),
+                           ([b["crush"] for b in GBLOCKS],"Crusher",AMBER),
+                           ([b["ref"] for b in GBLOCKS],"Refinery head",GREEN)]:
+            fig.add_trace(go.Scatter(x=ids,y=ys,mode="lines+markers",name=nm,line=dict(color=col,width=2),marker=dict(size=7)))
+        fig.update_layout(**CHART_LAYOUT,height=260,title=dict(text="Al₂O₃ grade reconciliation",font=dict(color=TXT,size=13)),
+                          xaxis=_ax(False),yaxis=dict(**_ax(),title=dict(text="Al₂O₃ %",font=dict(color=MUTED,size=10))),
+                          legend=dict(font=dict(color=TXT,size=10),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure()
+        for ys,nm,col in [([0.988,0.992,0.985,0.994],"F1 (mine/model)",CYAN),
+                           ([0.971,0.978,0.968,0.976],"F2 (mill/mine)",AMBER),
+                           ([0.952,0.961,0.949,0.958],"F3 (refinery/mill)",GREEN)]:
+            fig2.add_trace(go.Scatter(x=qtrs,y=ys,mode="lines+markers",name=nm,line=dict(color=col,width=2),marker=dict(size=8)))
+        fig2.add_hline(y=1.0,line_dash="dot",line_color=MUTED,line_width=1)
+        fig2.update_layout(**CHART_LAYOUT,height=260,title=dict(text="F1/F2/F3 factors — quarterly trend",font=dict(color=TXT,size=13)),
+                           xaxis=_ax(False),yaxis=dict(**_ax(),range=[0.93,1.07]),
+                           legend=dict(font=dict(color=TXT,size=10),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**📊 Block grade reconciliation table — Q2 2026**")
+        hdr=st.columns([1,1,1,1,1,1,1,1,1,1,1])
+        for col,h in zip(hdr,["Block","Pred Al₂O₃","BH Al₂O₃","Crusher","Refinery","Pred RSi","BH RSi","F1","F2","F3","Flag"]):
+            col.markdown(f"<span style='color:{MUTED};font-size:0.72rem;font-weight:700;text-transform:uppercase;'>{h}</span>",unsafe_allow_html=True)
+        for b in GBLOCKS:
+            flag=abs(b["f1"]-1)>0.03
+            row=st.columns([1,1,1,1,1,1,1,1,1,1,1])
+            fc=RED if flag else TXT
+            vals=[
+                (f"**{b['id']}**",fc),(f"{b['pred']}%",MUTED),(f"{b['bh']}%",TXT),
+                (f"{b['crush']}%",TXT),(f"{b['ref']}%",TXT),(f"{b['pred_rsi']}%",MUTED),
+                (f"{b['bh_rsi']}%",RED if b['bh_rsi']>3 else TXT),
+                (f"{b['f1']:.3f}",RED if abs(b['f1']-1)>0.03 else AMBER if abs(b['f1']-1)>0.015 else GREEN),
+                (f"{b['f2']:.3f}",MUTED),(f"{b['f3']:.3f}",MUTED),
+                ("⚠ Review" if flag else "✓",RED if flag else GREEN),
+            ]
+            for col,(txt,c) in zip(row,vals):
+                col.markdown(f"<span style='color:{c};font-weight:700;'>{txt}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  MAINTENANCE — MOBILE FLEET
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/local_shipping:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Maintenance Supervisor — Mobile Fleet</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Haul trucks · Excavators · Drill rigs · Preventive maintenance scheduling — Huntly Mine</p>",unsafe_allow_html=True)
+    FLEET=[
+        dict(id="T-01",tp="Haul Truck",hrs=482,iv=500,oil="Pass",vib="Normal",status="Monitor",next=3),
+        dict(id="T-02",tp="Haul Truck",hrs=498,iv=500,oil="Pass",vib="Normal",status="Service due",next=1),
+        dict(id="T-03",tp="Haul Truck",hrs=314,iv=500,oil="Pass",vib="Normal",status="Normal",next=37),
+        dict(id="T-07",tp="Haul Truck",hrs=256,iv=500,oil="Fail",vib="Normal",status="Oil alert",next=14),
+        dict(id="T-11",tp="Haul Truck",hrs=461,iv=500,oil="Pass",vib="Elevated",status="Monitor",next=8),
+        dict(id="EX-01",tp="Excavator",hrs=1840,iv=2000,oil="Pass",vib="Normal",status="Normal",next=32),
+        dict(id="EX-02",tp="Excavator",hrs=1974,iv=2000,oil="Pass",vib="Normal",status="Monitor",next=4),
+        dict(id="DR-01",tp="Drill Rig",hrs=720,iv=750,oil="Pass",vib="Normal",status="Monitor",next=10),
+        dict(id="DR-02",tp="Drill Rig",hrs=748,iv=750,oil="Pass",vib="Elevated",status="Service due",next=1),
+        dict(id="WC-01",tp="Water Cart",hrs=312,iv=400,oil="Pass",vib="Normal",status="Normal",next=22),
+    ]
+    SC4={"Normal":GREEN,"Monitor":AMBER,"Service due":RED,"Oil alert":RED}
+    urgent=sum(1 for f in FLEET if f["next"]<=7)
+    _metrics(
+        ("Service due ≤7 days",urgent,"Across all mobile fleet"),
+        ("Fleet active","38/42","4 in planned maintenance"),
+        ("Oil analysis alerts","1","T-07 — sample failure"),
+        ("Vib alerts","2","T-11, DR-02 elevated"),
+        ("Planning time saved","60%","3 hrs → 1 hr/week"),
+    )
+    sf=sorted(FLEET,key=lambda f:f["next"])
+    c1,c2=st.columns(2)
+    with c1:
+        ds=[f["next"] for f in sf]; aids=[f["id"] for f in sf]
+        fig=go.Figure(go.Bar(y=aids,x=ds,orientation="h",
+                               marker_color=[RED if d<=3 else AMBER if d<=7 else GREEN for d in ds],
+                               text=[f"{d}d" for d in ds],textposition="outside",textfont=dict(color=TXT,size=10)))
+        fig.add_vline(x=7,line_dash="dash",line_color=AMBER,line_width=1.5)
+        fig.update_layout(**CHART_LAYOUT,height=280,title=dict(text="Days until next service interval",font=dict(color=TXT,size=13)),
+                          xaxis=dict(**_ax(),range=[0,45]),yaxis=_ax(False),showlegend=False)
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        f8=FLEET[:8]
+        fig2=go.Figure()
+        fig2.add_trace(go.Bar(name="Engine hours",x=[f["id"] for f in f8],y=[f["hrs"] for f in f8],
+                               marker_color=[RED if f["hrs"]/f["iv"]>0.95 else AMBER if f["hrs"]/f["iv"]>0.85 else GREEN for f in f8]))
+        fig2.add_trace(go.Scatter(name="Service interval",x=[f["id"] for f in f8],y=[f["iv"] for f in f8],
+                                   mode="lines",line=dict(color=MUTED,dash="dash",width=1.5)))
+        fig2.update_layout(**CHART_LAYOUT,barmode="overlay",height=280,title=dict(text="Engine hours vs service interval",font=dict(color=TXT,size=13)),
+                           xaxis=_ax(False),yaxis=_ax(),legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**🔧 Fleet maintenance register**")
+        for f in FLEET:
+            pct=f["hrs"]/f["iv"]; sc=SC4[f["status"]]
+            ca,cb,cc,cd,ce,cf,cg=st.columns([1,1.5,1.5,3,1,1.2,1])
+            ca.markdown(f"**{f['id']}**")
+            cb.markdown(f"<span style='color:{MUTED}'>{f['tp']}</span>",unsafe_allow_html=True)
+            cc.markdown(f"<span style='color:{MUTED}'>{f['hrs']}/{f['iv']} hrs</span>",unsafe_allow_html=True)
+            cd.progress(min(1.0,pct))
+            ce.markdown(f"<span style='color:{RED if f['oil']=='Fail' else GREEN}'>Oil:{f['oil']}</span>",unsafe_allow_html=True)
+            cf.markdown(f"<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{f['status']}</span>",unsafe_allow_html=True)
+            cg.markdown(f"<span style='color:{RED if f['next']<=7 else AMBER if f['next']<=14 else MUTED}'>{f['next']}d</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  RELIABILITY ENGINEER
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/build:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Reliability Engineer</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Asset health · Vibration trending · Predictive maintenance — Huntly & Pinjarra</p>",unsafe_allow_html=True)
+    def _gvib(seed,base,drift):
+        rng=_srng2(seed); v=[base]
+        for _ in range(89):
+            v.append(max(1.5,min(12,v[-1]+(rng()-0.48)*0.12+drift*0.01)))
+        return [round(x*100)/100 for x in v]
+    now=datetime.now(); d90=[now-timedelta(days=89-i) for i in range(90)]
+    vib_c2=_gvib(42,3.2,1.2); vib_c1=_gvib(55,2.8,0.3); vib_kln=_gvib(66,4.1,0.5)
+    ASSETS=[
+        dict(id="C1",name="Primary Crusher 1",tp="Jaw Crusher",loc="Huntly Mine",health=92,vib=round(vib_c1[-1],2),motor=79,liner=68,next="14 days",mtbf=142,last="94 days ago",status="Normal",risk=12),
+        dict(id="C2",name="Primary Crusher 2",tp="Jaw Crusher",loc="Huntly Mine",health=61,vib=round(vib_c2[-1],2),motor=88,liner=91,next="3 days", mtbf=142,last="41 days ago",status="Warning",risk=68),
+        dict(id="KLN1",name="Rotary Kiln 1",  tp="Calcination Kiln",loc="Pinjarra",health=85,vib=4.1,motor=82,liner=54,next="28 days",mtbf=210,last="188 days ago",status="Normal",risk=18),
+        dict(id="KLN2",name="Rotary Kiln 2",  tp="Calcination Kiln",loc="Pinjarra",health=78,vib=5.8,motor=85,liner=77,next="9 days", mtbf=210,last="64 days ago", status="Monitor",risk=41),
+        dict(id="OC1",name="Overland Conveyor",tp="Belt Conveyor",loc="Huntly→Pinjarra",health=96,vib=1.8,motor=71,liner=22,next="45 days",mtbf=380,last="312 days ago",status="Normal",risk=4),
+        dict(id="THK1",name="Primary Thickener",tp="Gravity Thickener",loc="Pinjarra",health=88,vib=2.3,motor=68,liner=45,next="21 days",mtbf=95,last="78 days ago",status="Normal",risk=9),
+    ]
+    SC5={"Normal":GREEN,"Monitor":AMBER,"Warning":RED,"Critical":RED}
+    critical=sum(1 for a in ASSETS if a["status"] in ("Warning","Critical"))
+    _metrics(
+        ("Asset health avg",f"{sum(a['health'] for a in ASSETS)//len(ASSETS)}%","Across all critical fixed plant"),
+        ("Maint. due ≤14 days",sum(1 for a in ASSETS if any(d in a['next'] for d in ['3','9'])),"Scheduled windows"),
+        ("Est. unplanned cost","$68K","If C2 fails unplanned"),
+        ("MTBF improvement","+23%","vs prior 12 months"),
+    )
+    if critical>0:
+        st.error(f"⚠️ **Crusher 2 Main Bearing — Predicted failure in 8–14 days.** Vibration at {vib_c2[-1]} mm/s. Liner wear 91%. Recommend planned shutdown within 72 hrs.")
+    c1,c2=st.columns(2)
+    with c1:
+        fig=go.Figure()
+        fig.add_trace(go.Scatter(x=d90,y=vib_c2, mode="lines",name="Crusher 2",   line=dict(color=RED,width=2)))
+        fig.add_trace(go.Scatter(x=d90,y=vib_c1, mode="lines",name="Crusher 1",   line=dict(color=GREEN,width=1.5)))
+        fig.add_trace(go.Scatter(x=d90,y=vib_kln,mode="lines",name="Kiln 1 drive",line=dict(color=AMBER,width=1.5)))
+        fig.add_hline(y=7,line_dash="dash",line_color=RED,line_width=1.5,annotation_text="Alert threshold",annotation_font=dict(color=RED,size=10))
+        fig.update_layout(**CHART_LAYOUT,height=250,title=dict(text="Bearing vibration — 90-day trend (mm/s)",font=dict(color=TXT,size=13)),
+                          xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),
+                          legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure(go.Bar(y=[a["id"] for a in ASSETS],x=[a["health"] for a in ASSETS],orientation="h",
+                               marker_color=[GREEN if a["health"]>85 else AMBER if a["health"]>70 else RED for a in ASSETS],
+                               text=[f"{a['health']}%" for a in ASSETS],textposition="inside",textfont=dict(color="white",size=11)))
+        fig2.add_vline(x=75,line_dash="dash",line_color=AMBER,line_width=1.5)
+        fig2.update_layout(**CHART_LAYOUT,height=250,title=dict(text="Asset health index (%)",font=dict(color=TXT,size=13)),
+                           xaxis=dict(**_ax(),range=[0,105]),yaxis=_ax(False),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**🔧 Asset Health Register**")
+        for a in ASSETS:
+            sc=SC5[a["status"]]
+            with st.container(border=True):
+                ca,cb=st.columns([4,1])
+                with ca:
+                    st.markdown(f"**{a['name']}** &nbsp;<span style='color:{MUTED};font-size:0.78rem;'>{a['tp']} · {a['loc']}</span> &nbsp;<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:700;'>{a['status']}</span>",unsafe_allow_html=True)
+                    cols=st.columns(6)
+                    for col,(lbl,val,c) in zip(cols,[
+                        ("Health",f"{a['health']}%",GREEN if a['health']>85 else AMBER if a['health']>70 else RED),
+                        ("Vibration",f"{a['vib']} mm/s",RED if a['vib']>6 else AMBER if a['vib']>4 else GREEN),
+                        ("Motor",f"{a['motor']}%",MUTED),("Liner",f"{a['liner']}%",RED if a['liner']>85 else AMBER if a['liner']>70 else GREEN),
+                        ("MTBF",f"{a['mtbf']}d",CYAN),("Next maint",a['next'],MUTED),
+                    ]):
+                        col.markdown(f"<div style='font-size:0.7rem;color:{MUTED};text-transform:uppercase;'>{lbl}</div><div style='color:{c};font-weight:600;'>{val}</div>",unsafe_allow_html=True)
+                with cb:
+                    rc=RED if a["risk"]>50 else AMBER if a["risk"]>25 else GREEN
+                    st.markdown(f"Last fail: {a['last']}<br><span style='color:{rc};font-weight:700;'>Risk: {a['risk']}/100</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SUPPLY CHAIN PLANNER
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/inventory_2:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Supply Chain / Logistics Planner</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Refinery output · Rail schedule · Port stockpile · Vessel schedule · Demurrage risk — Bunbury</p>",unsafe_allow_html=True)
+    r=_srng2(33); now=datetime.now()
+    days7=[(now-timedelta(days=6-i)).strftime("%a") for i in range(7)]
+    siloP=[round(72+r()*18) for _ in range(7)]; siloW=[round(68+r()*20) for _ in range(7)]
+    portBin=[41200,38800,46100]
+    VESSELS=[
+        dict(name="MV Pinjarra Star", eta="6h",    vol=86400,cap=89000,status="Loading",  dem=False),
+        dict(name="MV Alcoa Pacific", eta="4d 18h",vol=82100,cap=84000,status="En route", dem=False),
+        dict(name="MV Bunbury Bulker",eta="1d 15h",vol=0,    cap=82000,status="Inbound",  dem=False),
+        dict(name="MV Southern Cross",eta="8d 6h", vol=77900,cap=80000,status="En route", dem=False),
+        dict(name="MV Wagerup Spirit",eta="4h",    vol=0,    cap=78000,status="At anchor",dem=True),
+    ]
+    tp=sum(portBin); demR=sum(1 for v in VESSELS if v["dem"])
+    _metrics(
+        ("Port stockpile total",f"{tp/1000:.1f}kt","3 bins × 50,000t capacity"),
+        ("Bin utilisation",f"{round(tp/150000*100)}%","Combined 150,000t"),
+        ("Demurrage risk",f"{demR} vessel" if demR>0 else "None","⚠ ~$10K/day" if demR>0 else "All on schedule"),
+        ("Rail on schedule","3/3 consists","All dispatch windows met"),
+        ("Demurrage savings","40%","vs pre-CoCo baseline"),
+    )
+    if demR>0:
+        st.error("⚠️ **Demurrage accruing — MV Wagerup Spirit at anchor 4h+.** Est. ~$10,000/day.")
+    c1,c2=st.columns([2,1])
+    with c1:
+        fig=go.Figure()
+        fig.add_trace(go.Bar(name="Pinjarra silo %",x=days7,y=siloP,marker_color=CYAN,opacity=0.8))
+        fig.add_trace(go.Bar(name="Wagerup silo %", x=days7,y=siloW,marker_color=AMBER,opacity=0.8))
+        fig.add_hline(y=85,line_dash="dash",line_color=RED,line_width=1.5)
+        fig.update_layout(**CHART_LAYOUT,barmode="group",height=230,title=dict(text="Refinery silo levels — 7-day trend (%)",font=dict(color=TXT,size=13)),
+                          xaxis=_ax(False),yaxis=dict(**_ax(),range=[0,105]),legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure(go.Bar(x=["Bin A","Bin B","Bin C"],y=portBin,
+                               marker_color=[RED if v>45000 else AMBER if v>40000 else GREEN for v in portBin],
+                               text=[f"{v/1000:.0f}kt" for v in portBin],textposition="inside",textfont=dict(color="white",size=11)))
+        fig2.add_hline(y=50000,line_dash="dash",line_color=RED,line_width=1.5)
+        fig2.update_layout(**CHART_LAYOUT,height=230,title=dict(text="Bunbury port bins (t)",font=dict(color=TXT,size=13)),
+                           xaxis=_ax(False),yaxis=dict(**_ax(),range=[0,52000]),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**🚢 Vessel schedule — next 14 days**")
+        for v in VESSELS:
+            sc=RED if v["dem"] else GREEN
+            ca,cb,cc,cd,ce=st.columns([2,1,2,1.5,1.5])
+            ca.markdown(f"**{v['name']}**")
+            cb.markdown(f"<span style='color:{MUTED}'>ETA: {v['eta']}</span>",unsafe_allow_html=True)
+            vol_str = f"{v['vol']/1000:.0f}kt alumina" if v['vol']>0 else 'Ballast'
+            vol_col = GREEN if v['vol']>0 else MUTED
+            cc.markdown(f"<span style='color:{vol_col}'>{vol_str}</span>",unsafe_allow_html=True)
+            ce.markdown(f"<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{'⚠ Demurrage' if v['dem'] else v['status']}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  TRAIN / PORT COORDINATOR
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/anchor:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Train / Port Loadout Coordinator</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Silo levels · Rail dispatch · Port stockpile · 48-hour schedule — Pinjarra, Wagerup & Bunbury</p>",unsafe_allow_html=True)
+    r=_srng2(88); now=datetime.now()
+    hrs48=[now-timedelta(hours=47-i) for i in range(48)]
+    sp48=[round(70+r()*20) for _ in range(48)]; sw48=[round(65+r()*25) for _ in range(48)]
+    pf=[round(82000+r()*10000) for _ in range(48)]
+    DISP=[
+        dict(id="PJR-001",orig="Pinjarra",dep="06:00",arr="07:30",pay=2110,mois=0.05,stat="Departed"),
+        dict(id="PJR-002",orig="Pinjarra",dep="09:45",arr="11:15",pay=2085,mois=0.06,stat="Loading"),
+        dict(id="PJR-003",orig="Pinjarra",dep="13:30",arr="15:00",pay=2100,mois=0.04,stat="Scheduled"),
+        dict(id="WGR-001",orig="Wagerup", dep="07:15",arr="07:55",pay=2090,mois=0.07,stat="Arrived"),
+        dict(id="WGR-002",orig="Wagerup", dep="10:00",arr="10:40",pay=2075,mois=0.06,stat="Loading"),
+        dict(id="WGR-003",orig="Wagerup", dep="14:00",arr="14:40",pay=0,   mois=None,stat="Scheduled"),
+    ]
+    dispatched=sum(1 for d in DISP if d["stat"] in ("Departed","Arrived"))
+    totalPay=sum(d["pay"] for d in DISP if d["pay"]>0)
+    _metrics(
+        ("Trains dispatched today",f"{dispatched}/6","Pinjarra + Wagerup"),
+        ("Total payload today",f"{totalPay/1000:.1f}kt","Alumina dispatched"),
+        ("Port bin utilisation","83%","124,000t of 150,000t"),
+        ("Moisture compliance","6/6 ✓","All below 0.5% IMO limit"),
+        ("Rail idle time saved","50%","vs whiteboard scheduling"),
+    )
+    x48=hrs48[::4]
+    c1,c2=st.columns(2)
+    with c1:
+        fig=go.Figure()
+        fig.add_trace(go.Scatter(x=x48,y=sp48[::4],mode="lines",name="Pinjarra silo %",line=dict(color=CYAN,width=2)))
+        fig.add_trace(go.Scatter(x=x48,y=sw48[::4],mode="lines",name="Wagerup silo %", line=dict(color=AMBER,width=2)))
+        fig.add_hline(y=85,line_dash="dash",line_color=RED,line_width=1.5)
+        fig.update_layout(**CHART_LAYOUT,height=220,title=dict(text="Silo levels — 48h trend (%)",font=dict(color=TXT,size=13)),
+                          xaxis=dict(**_ax(False),showticklabels=False),yaxis=dict(**_ax(),range=[50,100]),
+                          legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure(go.Scatter(x=x48,y=pf[::4],mode="lines",line=dict(color=GREEN,width=2),fill="tozeroy",fillcolor="rgba(16,185,129,0.08)"))
+        fig2.add_hline(y=150000,line_dash="dash",line_color=RED,line_width=1.5)
+        fig2.update_layout(**CHART_LAYOUT,height=220,title=dict(text="Bunbury port inventory (t)",font=dict(color=TXT,size=13)),
+                           xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**🚂 48-hour dispatch schedule**")
+        for d in DISP:
+            sc={"Arrived":GREEN,"Departed":CYAN,"Loading":AMBER,"Scheduled":MUTED}[d["stat"]]
+            oc=CYAN if d["orig"]=="Pinjarra" else AMBER
+            ca,cb,cc,cd,ce,cf,cg=st.columns([1,1,1,1,1.2,1,1.2])
+            ca.markdown(f"**{d['id']}**")
+            cb.markdown(f"<span style='color:{oc}'>{d['orig']}</span>",unsafe_allow_html=True)
+            cc.markdown(f"<span style='color:{MUTED}'>Dep:{d['dep']}</span>",unsafe_allow_html=True)
+            cd.markdown(f"<span style='color:{MUTED}'>Arr:{d['arr']}</span>",unsafe_allow_html=True)
+            pay_str=f"{d['pay']:,}t" if d["pay"]>0 else "Returning"
+            ce.markdown(f"<span style='color:{TXT if d['pay']>0 else MUTED}'>{pay_str}</span>",unsafe_allow_html=True)
+            mois_str=f"H₂O:{d['mois']}%" if d["mois"] is not None else "—"
+            mois_col=GREEN if d["mois"] is not None and d["mois"]<0.5 else RED if d["mois"] is not None else MUTED
+            cf.markdown(f"<span style='color:{mois_col}'>{mois_str}</span>",unsafe_allow_html=True)
+            cg.markdown(f"<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{d['stat']}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PROCUREMENT / WAREHOUSE
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/shopping_cart:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Procurement / Warehouse Manager</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Critical spares · Predictive reorder · Wear-based consumption · Supplier lead times</p>",unsafe_allow_html=True)
+    SPARES=[
+        dict(part="Jaw crusher liner set",        stock=1,mn=2,lead=14,wear=91,  reorder="Overdue",  cost=28000,status="Order now"),
+        dict(part="Haul truck engine filter kit", stock=4,mn=4,lead=3, wear=None,reorder="11 Jun",  cost=480,  status="Low"),
+        dict(part="Conveyor belt splice kit (×2)",stock=3,mn=2,lead=7, wear=22,  reorder="15 Jul",  cost=3200, status="OK"),
+        dict(part="Pump impeller (Warman 4/3)",   stock=2,mn=2,lead=10,wear=58,  reorder="28 Jun",  cost=4800, status="OK"),
+        dict(part="Calciner refractory brick (t)",stock=4,mn=3,lead=21,wear=54,  reorder="20 Jul",  cost=6200, status="OK"),
+        dict(part="Haul truck tyre 27.00R49",     stock=0,mn=1,lead=21,wear=None,reorder="Critical",cost=32000,status="Critical"),
+        dict(part='Drill bit tricone 9⅞"',        stock=8,mn=4,lead=5, wear=None,reorder="2 Aug",   cost=1100, status="OK"),
+        dict(part="Thickener rake arm bearing",   stock=1,mn=1,lead=14,wear=45,  reorder="4 Jul",   cost=2400, status="OK"),
+    ]
+    SC6={"Critical":RED,"Order now":RED,"Low":AMBER,"OK":GREEN}
+    critical=sum(1 for s in SPARES if s["status"] in ("Critical","Order now"))
+    totalVal=sum(s["stock"]*s["cost"] for s in SPARES)
+    months=["Jan","Feb","Mar","Apr","May","Jun"]
+    _metrics(
+        ("Critical stockouts",critical,"⚠ Production risk" if critical>0 else "✓ No stockout risk"),
+        ("Spares inventory value",f"${totalVal/1000:.0f}K","On-hand stock"),
+        ("Items below min stock",sum(1 for s in SPARES if s["stock"]<s["mn"]),"Reorder triggered"),
+        ("Cost reduction","30%","vs reactive ordering baseline"),
+    )
+    if critical>0:
+        with st.container(border=True):
+            st.markdown(f"<span style='color:{RED};font-weight:700;'>🚨 {critical} critical spare issue(s)</span>",unsafe_allow_html=True)
+            for s in SPARES:
+                if s["status"] in ("Critical","Order now"):
+                    st.markdown(f"• **{s['part']}** — Stock: {s['stock']} (min: {s['mn']}) · Lead: {s['lead']}d · ${s['cost']:,}")
+    c1,c2=st.columns(2)
+    with c1:
+        labels=[s["part"][:28]+"…" if len(s["part"])>28 else s["part"] for s in SPARES]
+        vals=[s["stock"]/s["mn"]*100 for s in SPARES]
+        fig=go.Figure(go.Bar(y=labels,x=vals,orientation="h",
+                               marker_color=[SC6[s["status"]] for s in SPARES],
+                               text=[f"{s['stock']}/{s['mn']}" for s in SPARES],textposition="outside",textfont=dict(color=TXT,size=9)))
+        fig.add_vline(x=100,line_dash="dash",line_color=AMBER,line_width=1.5)
+        fig.update_layout(**CHART_LAYOUT,height=300,title=dict(text="Stock level vs minimum (% of min)",font=dict(color=TXT,size=13)),
+                          xaxis=dict(**_ax(),range=[0,220]),yaxis=dict(**_ax(False),tickfont=dict(color=MUTED,size=9)),showlegend=False)
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure()
+        fig2.add_trace(go.Bar(name="Planned spend",x=months,y=[v*1000 for v in [42,38,51,44,48,53]],marker_color=CYAN,opacity=0.7))
+        fig2.add_trace(go.Bar(name="Actual spend", x=months,y=[v*1000 for v in [38,41,49,46,52,58]],marker_color=AMBER,opacity=0.9))
+        fig2.update_layout(**CHART_LAYOUT,barmode="group",height=300,title=dict(text="Monthly procurement spend ($)",font=dict(color=TXT,size=13)),
+                           xaxis=_ax(False),yaxis=_ax(),legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**📦 Critical spares register**")
+        for s in SPARES:
+            sc=SC6[s["status"]]
+            ca,cb,cc,cd,ce,cf=st.columns([3,1.5,1,1.5,1,1.2])
+            ca.markdown(s["part"])
+            cb.markdown(f"Stock:<span style='color:{GREEN if s['stock']>=s['mn'] else RED};font-weight:700;'>{s['stock']}</span>/{s['mn']}",unsafe_allow_html=True)
+            cc.markdown(f"<span style='color:{MUTED}'>Lead:{s['lead']}d</span>",unsafe_allow_html=True)
+            if s["wear"] is not None: cd.progress(s["wear"]/100)
+            ce.markdown(f"<span style='color:{MUTED}'>${s['cost']:,}</span>",unsafe_allow_html=True)
+            cf.markdown(f"<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{s['status']}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  ENVIRONMENTAL ADVISOR
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/eco:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Environmental Advisor</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>EPA licence compliance · Dust, noise, water, rehabilitation — Huntly Mine, WA</p>",unsafe_allow_html=True)
+    r=_srng2(11); now=datetime.now()
+    hrs24=[now-timedelta(hours=23-i) for i in range(24)]
+    pm10=[max(8,min(85,38+(r()-0.5)*36)) for _ in range(24)]
+    pm25=[max(3,min(35,14+(r()-0.5)*16)) for _ in range(24)]
+    noise=[max(42,min(98,72+(r()-0.5)*28)) for _ in range(24)]
+    water=[max(140,min(420,280+(r()-0.5)*120)) for _ in range(24)]
+    REHAB=[
+        dict(zone="Zone 4A",target=65,done=62,status="On track"),
+        dict(zone="Zone 4B",target=40,done=44,status="Ahead"),
+        dict(zone="Zone 5A",target=80,done=68,status="Behind"),
+        dict(zone="Zone 5B",target=30,done=30,status="Complete"),
+        dict(zone="Zone 6A",target=55,done=41,status="Behind"),
+        dict(zone="Zone 6B",target=20,done=20,status="Complete"),
+    ]
+    EPA=[
+        dict(param="PM10 (24-hr avg)",      limit=50, current=38.2,unit="µg/m³",status="Compliant"),
+        dict(param="PM2.5 (24-hr avg)",     limit=25, current=14.1,unit="µg/m³",status="Compliant"),
+        dict(param="Blast noise (dBL)",     limit=115,current=94,  unit="dBL",  status="Compliant"),
+        dict(param="Ground vib (PPV)",      limit=20, current=8.2, unit="mm/s", status="Compliant"),
+        dict(param="Water extraction",      limit=520,current=484, unit="ML/mo",status="Compliant"),
+        dict(param="Rehab ha YTD",          limit=550,current=285, unit="ha",   status="On track"),
+        dict(param="Clearing approval buf.",limit=10, current=8.4, unit="%",    status="Monitor"),
+        dict(param="Haul road dust PM10",   limit=50, current=62,  unit="µg/m³",status="Exceedance"),
+    ]
+    exceedances=sum(1 for e in EPA if e["status"]=="Exceedance")
+    avgPM10=sum(pm10)/len(pm10)
+    totalRehab=sum(r["done"] for r in REHAB); totalTarget=sum(r["target"] for r in REHAB)
+    _metrics(
+        ("EPA exceedances",exceedances,"⚠️ Action required" if exceedances>0 else "✓ All within limits"),
+        ("PM10 24-hr avg",f"{avgPM10:.1f} µg/m³","Limit: 50 µg/m³"),
+        ("Rehab YTD",f"{totalRehab} ha",f"Target: {totalTarget} ha"),
+        ("Water use MTD","484 ML","Limit: 520 ML/month"),
+        ("Fauna detections","3","Last 24 hrs"),
+        ("Active blast notices","1","Zone 5A — 14:00 today"),
+    )
+    if exceedances>0:
+        st.error("⚠️ **EPA Exceedance — Haul Road PM10:** 62 µg/m³ (limit 50). Water cart dispatched. If sustained >2 hrs, blast program must be suspended.")
+    c1,c2=st.columns(2)
+    with c1:
+        fig=go.Figure()
+        fig.add_trace(go.Scatter(x=hrs24,y=pm10,mode="lines",name="PM10", line=dict(color=AMBER,width=2),fill="tozeroy",fillcolor="rgba(245,158,11,0.08)"))
+        fig.add_trace(go.Scatter(x=hrs24,y=pm25,mode="lines",name="PM2.5",line=dict(color=CYAN,width=2)))
+        fig.add_hline(y=50,line_dash="dash",line_color=RED,line_width=1.5,annotation_text="EPA limit 50",annotation_font=dict(color=RED,size=10))
+        fig.update_layout(**CHART_LAYOUT,height=220,title=dict(text="Dust — PM10/PM2.5 (µg/m³)",font=dict(color=TXT,size=13)),
+                          xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure(go.Scatter(x=hrs24,y=noise,mode="lines",line=dict(color="#7C3AED",width=2),fill="tozeroy",fillcolor="rgba(124,58,237,0.08)"))
+        fig2.add_hline(y=115,line_dash="dash",line_color=RED,line_width=1.5,annotation_text="EPA limit",annotation_font=dict(color=RED,size=10))
+        fig2.update_layout(**CHART_LAYOUT,height=220,title=dict(text="Community noise (dBL)",font=dict(color=TXT,size=13)),
+                           xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    c1,c2=st.columns([2,1])
+    with c1:
+        fig3=go.Figure()
+        fig3.add_trace(go.Bar(name="Completed",x=[r["zone"] for r in REHAB],y=[r["done"] for r in REHAB],
+                               marker_color=[GREEN if r["done"]>=r["target"] else AMBER if r["done"]/r["target"]>0.85 else RED for r in REHAB]))
+        fig3.add_trace(go.Bar(name="Target",   x=[r["zone"] for r in REHAB],y=[r["target"] for r in REHAB],marker_color="rgba(148,163,184,0.25)"))
+        fig3.update_layout(**CHART_LAYOUT,barmode="overlay",height=230,title=dict(text="Rehabilitation progress by zone (ha)",font=dict(color=TXT,size=13)),
+                           xaxis=_ax(False),yaxis=_ax(),legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig3,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig4=go.Figure(go.Bar(x=hrs24[::4],y=water[::4],marker_color=BLUE,opacity=0.8))
+        fig4.update_layout(**CHART_LAYOUT,height=230,title=dict(text="Haul road water use (kL/hr)",font=dict(color=TXT,size=13)),
+                           xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),showlegend=False)
+        st.plotly_chart(fig4,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**📋 EPA Licence Compliance**")
+        SC7={"Compliant":(GREEN,"✓"),"On track":(GREEN,"✓"),"Ahead":(CYAN,"▲"),"Monitor":(AMBER,"⚠"),"Behind":(AMBER,"↓"),"Exceedance":(RED,"✗"),"Complete":(BLUE,"●")}
+        for e in EPA:
+            col,sym=SC7.get(e["status"],(MUTED,"?"))
+            ca,cb,cc,cd,ce=st.columns([3,2,1.5,2,1.5])
+            ca.markdown(e["param"])
+            cb.progress(min(1.0,e["current"]/e["limit"]))
+            cc.markdown(f"{e['current']} {e['unit']}")
+            cd.markdown(f"<span style='color:{MUTED}'>limit: {e['limit']} {e['unit']}</span>",unsafe_allow_html=True)
+            ce.markdown(f"<span style='background:{col}22;color:{col};padding:1px 8px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{sym} {e['status']}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SAFETY / HSE MANAGER
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/security:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Safety / HSE Manager</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Incident tracking · Fatigue management · Proximity alerts · Training compliance — Huntly Mine</p>",unsafe_allow_html=True)
+    months=["Jan","Feb","Mar","Apr","May","Jun"]
+    inc_m=[1,0,2,1,0,1]; nm_m=[3,2,4,2,1,3]; dl=[1,0,3,1,0,0]
+    INCIDENTS=[
+        dict(id="INC-2026-047",sev="High",  tp="Near-miss",date="2026-06-09",time="10:34",loc="Pit 4 haul road",
+             desc="Haul truck T07 vs water cart — <3m clearance at blind crest. Operator fatigue 82%.",status="Investigation open",dl=0),
+        dict(id="INC-2026-041",sev="Medium",tp="Spill",    date="2026-06-03",time="14:22",loc="S5 digestion area",
+             desc="NaOH caustic spill — 20L from cracked pipe coupling. Contained within bund.",status="Closed",dl=0),
+        dict(id="INC-2026-038",sev="Low",   tp="LTI",      date="2026-05-28",time="09:15",loc="Maintenance workshop",
+             desc="Hand laceration — chip from angle grinder. 1 day lost time.",status="Closed",dl=1),
+        dict(id="INC-2026-031",sev="High",  tp="Near-miss",date="2026-05-14",time="16:48",loc="ROM pad",
+             desc="Excavator swing hazard — GRD-01 in blind spot during face-cleaning pass.",status="Closed",dl=0),
+    ]
+    SC8={"High":RED,"Medium":AMBER,"Low":MUTED}; SC9={"Investigation open":RED,"Closed":GREEN}
+    openInc=sum(1 for i in INCIDENTS if i["status"]=="Investigation open")
+    PERSONNEL=[dict(name=f"Operator {i:03d}",role="Haul Truck",zone="Pit 4",fatigue=50+i%45,hours=i%12+6) for i in range(42)]
+    HIGH_FAT=[p for p in PERSONNEL if p["fatigue"]>70]
+    _metrics(
+        ("Days since LTI","41","Last: 1-day laceration (May 28)"),
+        ("Open investigations",openInc,"⚠️ INC-2026-047 critical" if openInc>0 else "✓ All closed"),
+        ("High-fatigue personnel",len(HIGH_FAT),"Score >70% on fatigue index"),
+        ("Training overdue","6","Hazard awareness & certs"),
+        ("Proximity alerts today","7","3 high-severity"),
+        ("Active personnel",len(PERSONNEL),f"{len(PERSONNEL)} on site"),
+    )
+    st.error("🚨 **Open Investigation — INC-2026-047.** Haul truck T07 vs water cart — Pit 4, 10:34 AWST. Operator fatigue 82%. Report due 2026-06-10.")
+    c1,c2=st.columns(2)
+    with c1:
+        fig=go.Figure()
+        fig.add_trace(go.Bar(name="Recordable incidents",x=months,y=inc_m,marker_color=RED,opacity=0.8))
+        fig.add_trace(go.Bar(name="Near-misses",         x=months,y=nm_m, marker_color=AMBER,opacity=0.8))
+        fig.update_layout(**CHART_LAYOUT,barmode="group",height=240,title=dict(text="2026 incident trend",font=dict(color=TXT,size=13)),
+                          xaxis=_ax(False),yaxis=_ax(),legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure(go.Bar(x=months,y=dl,marker_color=[RED if d>3 else AMBER if d>1 else GREEN for d in dl],
+                               text=[str(d) for d in dl],textposition="outside",textfont=dict(color=TXT,size=11)))
+        fig2.update_layout(**CHART_LAYOUT,height=240,title=dict(text="Lost time days by month",font=dict(color=TXT,size=13)),
+                           xaxis=_ax(False),yaxis=_ax(),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**📋 Incident Register (last 30 days)**")
+        for inc in INCIDENTS:
+            sc=SC8[inc["sev"]]; st2=SC9[inc["status"]]
+            with st.container(border=True):
+                ca,cb=st.columns([5,1])
+                ca.markdown(f"**{inc['id']}** &nbsp;<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:700;'>{inc['sev']} · {inc['tp']}</span> &nbsp;<span style='color:{MUTED};font-size:0.78rem;'>{inc['date']} {inc['time']} · {inc['loc']}</span>",unsafe_allow_html=True)
+                ca.markdown(inc["desc"])
+                cb.markdown(f"<span style='color:{st2};font-weight:600;'>{'🔴' if inc['status']=='Investigation open' else '🟢'} {inc['status']}</span>",unsafe_allow_html=True)
+                if inc["dl"]>0: cb.markdown(f"<span style='color:{RED}'>{inc['dl']} day(s) lost</span>",unsafe_allow_html=True)
+    c1,c2=st.columns(2)
+    with c1:
+        with st.container(border=True):
+            st.markdown(f"**😴 Fatigue Management — {len(HIGH_FAT)} flagged**")
+            shown=0
+            for p in PERSONNEL:
+                if p["fatigue"]>55 and shown<6:
+                    fc=RED if p["fatigue"]>70 else AMBER
+                    st.markdown(f"<span style='color:{TXT}'>{p['name']}</span> &nbsp;<span style='color:{MUTED};font-size:0.78rem;'>{p['role']} · {p['hours']}h</span>",unsafe_allow_html=True)
+                    st.progress(p["fatigue"]/100)
+                    shown+=1
+            if HIGH_FAT: st.error(f"⚠️ {len(HIGH_FAT)} operator(s) above 70% — mandatory rest required")
+    with c2:
+        with st.container(border=True):
+            st.markdown("**📍 Proximity Alerts Today**")
+            for time_,assets,loc,sev,dist in [
+                ("10:34","T07 + WC-03","Pit 4 crest","High","< 3m"),
+                ("08:12","T03 + EX-02","Pit 3 access","Medium","8m"),
+                ("07:45","GRD-01 + T11","ROM pad entry","Low","12m"),
+            ]:
+                sc=RED if sev=="High" else AMBER if sev=="Medium" else MUTED
+                ca,cb,cc,cd=st.columns([1,1.5,2,1])
+                ca.markdown(f"<span style='color:{MUTED}'>{time_}</span>",unsafe_allow_html=True)
+                cb.markdown(f"<span style='color:{sc};font-weight:700;'>{sev}</span>",unsafe_allow_html=True)
+                cc.markdown(f"{assets} · {loc}")
+                cd.markdown(f"<span style='color:{sc};font-weight:700;'>{dist}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  ENERGY / SUSTAINABILITY
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/bolt:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Energy / Sustainability Manager</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Scope 1 & 2 emissions · 2030 reduction pathway · ESG reporting — Alcoa Australia</p>",unsafe_allow_html=True)
+    months=["Jan","Feb","Mar","Apr","May","Jun"]
+    s1m=[1820,1740,1890,1810,1960,1840]; s1c=[4200,4050,4380,4190,4420,4280]
+    s2e=[2100,2080,2140,2090,2160,2110]; s2r=[380,365,392,378,401,385]
+    tgt=[round(9500-i*120) for i in range(6)]
+    tot=[s1m[i]+s1c[i]+s2e[i]+s2r[i] for i in range(6)]
+    mtd=tot[5]; vs30=round((mtd-tgt[5])/tgt[5]*100)
+    _metrics(
+        ("Total Scope 1+2 MTD",f"{mtd/1000:.1f}kt CO₂e",f"{'▲ +' if vs30>0 else '▼ '}{abs(vs30)}% vs 2030 target path"),
+        ("Mine diesel (Scope 1)",f"{s1m[5]}t CO₂e","Haul fleet + plant"),
+        ("Calciner gas (Scope 1)",f"{s1c[5]}t CO₂e","Largest single source (49%)"),
+        ("Grid electricity (Sc2)",f"{s2e[5]}t CO₂e","Refinery + conveyor"),
+        ("Rail transport (Sc2)",f"{s2r[5]}t CO₂e","Pinjarra/Wagerup → Bunbury"),
+        ("Reporting cycle saved","85%","3 weeks → 2-3 days (CoCo)"),
+    )
+    c1,c2=st.columns(2)
+    with c1:
+        fig=go.Figure()
+        for ys,nm,col in [(s1m,"Mine diesel",AMBER),(s1c,"Calciner gas",RED),(s2e,"Grid electricity",CYAN),(s2r,"Rail transport",BLUE)]:
+            fig.add_trace(go.Bar(name=nm,x=months,y=ys,marker_color=col,opacity=0.9))
+        fig.add_trace(go.Scatter(name="2030 target pathway",x=months,y=tgt,mode="lines+markers",
+                                  line=dict(color=GREEN,width=2,dash="dash"),marker=dict(size=6)))
+        fig.update_layout(**CHART_LAYOUT,barmode="stack",height=280,title=dict(text="Monthly Scope 1+2 emissions vs 2030 target (t CO₂e)",font=dict(color=TXT,size=13)),
+                          xaxis=_ax(False),yaxis=_ax(),legend=dict(font=dict(color=TXT,size=10),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure(go.Pie(labels=["Calciner gas (S1)","Grid electricity (S2)","Mine diesel (S1)","Rail transport (S2)"],
+                               values=[s1c[5],s2e[5],s1m[5],s2r[5]],
+                               marker_colors=[RED,CYAN,AMBER,BLUE],hole=0.4,
+                               textinfo="percent+label",textfont=dict(color=TXT,size=10)))
+        fig2.update_layout(**CHART_LAYOUT,height=280,title=dict(text="Emissions breakdown — June MTD",font=dict(color=TXT,size=13)),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**🎯 Top 3 reduction opportunities**")
+        for rank,action,saving,effort,timeline,cost in [
+            (1,"Calciner fuel switch — natural gas to green hydrogen blend (20%)","−856t CO₂e/month","High","2027","$12M capex"),
+            (2,"Haul fleet electrification — pilot 3× electric haul trucks at Huntly","−320t CO₂e/month","Medium","2026","$8M"),
+            (3,"Solar PV + battery at Pinjarra refinery (10 MW)","−185t CO₂e/month","Low","2025","$14M"),
+        ]:
+            with st.container(border=True):
+                ca,cb,cc=st.columns([0.3,6,1.5])
+                ca.markdown(f"**{rank}**")
+                cb.markdown(f"**{action}**")
+                cc.markdown(f"<span style='color:{GREEN};font-weight:700;'>{saving}</span>",unsafe_allow_html=True)
+                st.caption(f"Effort: {effort} · Timeline: {timeline} · Investment: {cost}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PAGE 5 — TRAIN TRACKER
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/train:" in page:
+    PINJARRA_LAT, PINJARRA_LON = -32.524, 115.963
+    WAGERUP_LAT,  WAGERUP_LON  = -33.304, 115.897
+    PORT_LAT,     PORT_LON     = -33.327, 115.637
+
+    st.markdown(
+        "<h1 style='margin:0;font-size:1.75rem;'>Train Tracker</h1>"
+        "<p style='color:#94A3B8;margin:0 0 20px 0;'>Alumina rail movements — Pinjarra & Wagerup → Port of Bunbury (~2,100 t/train)</p>",
+        unsafe_allow_html=True,
+    )
+
+    def _srng(seed, slot):
+        s = [(seed + slot * 3) | 0]
+        def _r():
+            s[0] = (s[0] ^ (s[0] >> 15)) * (1 | s[0]) & 0xFFFFFFFF
+            s[0] = (s[0] ^ (s[0] + (s[0] ^ (s[0] >> 7)) * 61)) & 0xFFFFFFFF
+            return ((s[0] ^ (s[0] >> 14)) & 0xFFFFFFFF) / 4294967296
+        return _r
+
+    slot = int(datetime.now().timestamp() / 30)
+    ROUTES_T = {
+        "pinjarra": dict(oLat=PINJARRA_LAT, oLon=PINJARRA_LON, dLat=PORT_LAT, dLon=PORT_LON, dist_km=80, color=CYAN,  label="Pinjarra → Bunbury"),
+        "wagerup":  dict(oLat=WAGERUP_LAT,  oLon=WAGERUP_LON,  dLat=PORT_LAT, dLon=PORT_LON, dist_km=25, color=AMBER, label="Wagerup → Bunbury"),
+    }
+    TRAIN_CFGS = [
+        ("PJR-001","pinjarra",101),("PJR-002","pinjarra",202),("PJR-003","pinjarra",303),
+        ("WGR-001","wagerup",401),("WGR-002","wagerup",502),
+    ]
+    STATUS_TC = {"Running":GREEN,"Loading":CYAN,"Unloading":AMBER,"Delayed":RED}
+
+    trains = []
+    for tid, route_id, seed in TRAIN_CFGS:
+        rd = ROUTES_T[route_id]; rng = _srng(seed, slot)
+        prog = rng(); lat = rd["oLat"] + (rd["dLat"]-rd["oLat"])*prog
+        lon  = rd["oLon"] + (rd["dLon"]-rd["oLon"])*prog
+        r2   = rng()
+        st_  = "Loading" if prog < 0.05 else "Unloading" if prog > 0.95 else ("Delayed" if r2 > 0.9 else "Running")
+        spd  = 60 + rng()*20 if st_ == "Running" else 5 + rng()*15 if st_ == "Delayed" else 0
+        eta  = int((1-prog)*rd["dist_km"]/spd*60) if spd > 0 else 999
+        trains.append(dict(id=tid, route=route_id, lat=round(lat,5), lon=round(lon,5),
+                           status=st_, speed=round(spd), payload=round(1800+rng()*300),
+                           moisture=round((0.03+rng()*0.06)*1000)/1000,
+                           wagons=21+round(rng()*3), eta=eta))
+
+    running = sum(1 for t in trains if t["status"]=="Running")
+    delayed = sum(1 for t in trains if t["status"]=="Delayed")
+    payload = sum(t["payload"] for t in trains if t["status"] in ("Running","Delayed"))
+
+    c1,c2,c3,c4,c5,c6 = st.columns(6)
+    c1.metric("Trains running",     running,     border=True)
+    c2.metric("Delayed",            delayed,     border=True)
+    c3.metric("In-transit payload", f"{payload/1000:.1f}kt", border=True)
+    c4.metric("Pinjarra trains",    sum(1 for t in trains if t["route"]=="pinjarra"), border=True)
+    c5.metric("Wagerup trains",     sum(1 for t in trains if t["route"]=="wagerup"),  border=True)
+    c6.metric("Annual throughput",  "~6 Mtpa",   border=True)
+
+    esri = [dict(below="traces", sourcetype="raster",
+                 sourceattribution="Esri | National Geographic",
+                 source=["https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}"])]
+    fig = go.Figure()
+    for rid, rd in ROUTES_T.items():
+        fig.add_trace(go.Scattermapbox(
+            lat=[rd["oLat"],rd["dLat"]], lon=[rd["oLon"],rd["dLon"]],
+            mode="lines", line=dict(width=2.5,color=rd["color"]), opacity=0.45,
+            hoverinfo="skip", showlegend=False))
+    for name, lat, lon, sym in [
+        ("Pinjarra Refinery",PINJARRA_LAT,PINJARRA_LON,CYAN),
+        ("Wagerup Refinery",WAGERUP_LAT,WAGERUP_LON,AMBER),
+        ("Port of Bunbury",PORT_LAT,PORT_LON,GREEN)
+    ]:
+        fig.add_trace(go.Scattermapbox(
+            lat=[lat], lon=[lon], mode="markers+text",
+            marker=dict(size=18,color=sym),
+            text=["⚓" if "Port" in name else "🏭"],
+            hovertemplate=f"<b>{name}</b><extra></extra>",
+            textfont=dict(size=11,color="white"), showlegend=False))
+    for rid, rd in ROUTES_T.items():
+        rt = [t for t in trains if t["route"]==rid]
+        fig.add_trace(go.Scattermapbox(
+            lat=[t["lat"] for t in rt], lon=[t["lon"] for t in rt],
+            mode="markers", name=rd["label"],
+            marker=dict(size=16,color=[STATUS_TC[t["status"]] for t in rt],opacity=0.95),
+            customdata=[[t["id"],t["status"],t["speed"],t["payload"],t["eta"],t["wagons"]] for t in rt],
+            hovertemplate="<b>🚂 %{customdata[0]}</b><br>Status: %{customdata[1]}<br>Speed: %{customdata[2]} km/h<br>Payload: %{customdata[3]} t<br>ETA: %{customdata[4]} min<extra></extra>"))
+    fig.update_layout(**CHART_LAYOUT, height=460,
+                      mapbox=dict(style="white-bg", layers=esri, center=dict(lat=-33.1,lon=115.76), zoom=8.5),
+                      margin=dict(l=0,r=0,t=0,b=0),
+                      legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(13,33,55,0.85)"))
+    st.plotly_chart(fig, use_container_width=True, config=dict(scrollZoom=True))
+
+    cols = st.columns(5)
+    for i, t in enumerate(trains):
+        rd = ROUTES_T[t["route"]]
+        with cols[i % 5]:
+            with st.container(border=True):
+                sc = STATUS_TC[t["status"]]
+                st.markdown(f"**🚂 {t['id']}** &nbsp;<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:700;'>{t['status']}</span>", unsafe_allow_html=True)
+                st.markdown(f"<div style='font-size:0.72rem;color:{rd['color']};font-weight:600;'>{t['route'].capitalize()} Refinery</div>", unsafe_allow_html=True)
+                eta_str = "At terminal" if t['eta'] >= 999 else f"{t['eta']} min"
+                moist_flag = "⚠️" if t['moisture'] > 0.5 else "✓"
+                st.markdown(f"<div style='font-size:0.78rem;color:#94A3B8;line-height:1.9;'>📦 {t['payload']:,} t<br>⚡ {t['speed']} km/h · {t['wagons']} wagons<br>⏱ ETA: {eta_str}<br>💧 {t['moisture']}% {moist_flag}</div>", unsafe_allow_html=True)
+
+    st.caption("⏱ Auto-refreshes every 30s · Port of Bunbury: 3×50,000t storage bins · ~6 Mtpa annual throughput")
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PERSONA DASHBOARD HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+def _srng2(seed):
+    s = [seed | 0]
+    def _r():
+        s[0] = (s[0] ^ (s[0] >> 15)) * (1 | s[0]) & 0xFFFFFFFF
+        s[0] = (s[0] ^ (s[0] + (s[0] ^ (s[0] >> 7)) * 61)) & 0xFFFFFFFF
+        return ((s[0] ^ (s[0] >> 14)) & 0xFFFFFFFF) / 4294967296
+    return _r
+
+def _metrics(*items):
+    cols = st.columns(len(items))
+    for col, (label, value, delta) in zip(cols, items):
+        col.metric(label, value, delta, border=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PRODUCTION SUPERINTENDENT
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/clipboard_list:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Production Superintendent</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Morning briefing — overnight shift summary · Huntly Mine</p>", unsafe_allow_html=True)
+    r = _srng2(77)
+    now = datetime.now()
+    hrs12 = [now - timedelta(hours=11-i) for i in range(12)]
+    mined  = [round(1800 + r()*600) for _ in range(12)]
+    crusher= [round(v*(0.88+r()*0.08)) for v in mined]
+    futl   = [round(72 + r()*20) for _ in range(12)]
+
+    st.info("🤖 **AUTO-GENERATED 06:00 AWST** — Ready for 07:00 production meeting")
+    _metrics(
+        ("Tonnes mined (night)","19,120 t","▲ +720t vs plan"),
+        ("Fleet utilisation","87%","▲ +5% vs target"),
+        ("Crusher availability","91%","▼ −4% vs 95% target"),
+        ("Ore grade Al₂O₃","28.8%","▼ −0.6% vs model"),
+        ("Active incidents","0","✓ Clean shift"),
+        ("Env. exceedances","1","PM10 Monitor 3"),
+    )
+
+    c1,c2 = st.columns([2,1])
+    with c1:
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=hrs12,y=mined,  mode="lines",name="Tonnes mined/hr",line=dict(color=CYAN,width=2),fill="tozeroy",fillcolor="rgba(0,180,216,0.07)"))
+        fig.add_trace(go.Scatter(x=hrs12,y=crusher,mode="lines",name="Crusher output", line=dict(color=BLUE,width=2)))
+        fig.update_layout(**CHART_LAYOUT,height=220,title=dict(text="Overnight haulage & crusher (t/hr)",font=dict(color=TXT,size=13)),
+                          xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),
+                          legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fc=[GREEN if v>85 else AMBER if v>75 else RED for v in futl]
+        fig2=go.Figure(go.Bar(x=list(range(12)),y=futl,marker_color=fc))
+        fig2.update_layout(**CHART_LAYOUT,height=220,title=dict(text="Fleet utilisation %",font=dict(color=TXT,size=13)),
+                           xaxis=dict(**_ax(False),showticklabels=False),yaxis=dict(**_ax(),range=[0,105]),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+
+    with st.container(border=True):
+        st.markdown("**📊 Shift vs Plan**")
+        for label,plan,actual,unit in [
+            ("Tonnes mined",18400,19120,"t"),("Fleet utilisation",82,87,"%"),
+            ("Crusher availability",95,91,"%"),("Ore grade Al₂O₃",29.4,28.8,"%"),
+            ("Safety incidents",0,0,""),("Env. exceedances",0,1,""),
+        ]:
+            pct=actual/plan if plan>0 else 1
+            col=GREEN if actual>=plan else AMBER
+            status="Above plan" if actual>=plan else ("On plan" if actual==plan else "Below plan")
+            ca,cb,cc,cd=st.columns([3,2,2,2])
+            ca.markdown(label)
+            cb.markdown(f"<span style='color:{MUTED}'>Plan: {plan}{unit}</span>",unsafe_allow_html=True)
+            cc.markdown(f"<span style='color:{col};font-weight:700;'>Actual: {actual}{unit}</span>",unsafe_allow_html=True)
+            cd.markdown(f"<span style='background:{col}22;color:{col};padding:1px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{status}</span>",unsafe_allow_html=True)
+            st.progress(min(1.0,pct))
+
+    with st.container(border=True):
+        st.markdown("**⚡ Actions for Morning Meeting**")
+        for p,item,owner in [
+            ("🔴","Crusher 2 bearing alert — schedule maintenance window","Reliability"),
+            ("🟡","Haul road PM10 exceedance at Monitor 3 — water cart deployed","Environmental"),
+            ("🟡","Ore grade below model in Block 5A — notify Geologist","Mine Planning"),
+            ("🟢","Rail dispatch on schedule — 3 consists to Bunbury by 18:00","Train/Port"),
+            ("🟢","Caustic inventory confirmed — 8,200t in port storage","Supply Chain"),
+        ]:
+            ca,cb,cc=st.columns([0.5,8,2])
+            ca.markdown(p)
+            cb.markdown(item)
+            cc.markdown(f"<span style='color:{MUTED}'>→ {owner}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  MINE PLANNING ENGINEER
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/map:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Mine Planning Engineer</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Weekly mine plan · Block selection · Equipment availability — Huntly Mine</p>",unsafe_allow_html=True)
+    BLOCKS=[
+        dict(id="B-42A",al2o3=38.2,rsi=2.1,dist=0.8,area=4.2,status="Cleared", equip="Available",approved=True),
+        dict(id="B-42B",al2o3=36.8,rsi=2.8,dist=1.1,area=3.8,status="Cleared", equip="Available",approved=True),
+        dict(id="B-43A",al2o3=34.1,rsi=3.4,dist=1.6,area=5.1,status="Cleared", equip="Partial",  approved=True),
+        dict(id="B-43B",al2o3=39.4,rsi=1.9,dist=2.2,area=4.7,status="Drilled", equip="Available",approved=False),
+        dict(id="B-44A",al2o3=37.6,rsi=2.3,dist=2.8,area=3.3,status="Planned", equip="Available",approved=True),
+        dict(id="B-44B",al2o3=32.4,rsi=4.1,dist=3.4,area=6.0,status="Planned", equip="Partial",  approved=False),
+        dict(id="B-45A",al2o3=40.1,rsi=1.7,dist=1.4,area=4.9,status="Cleared", equip="Available",approved=True),
+        dict(id="B-45B",al2o3=35.5,rsi=2.6,dist=1.8,area=3.6,status="Cleared", equip="Available",approved=True),
+    ]
+    qual=[b for b in BLOCKS if b["al2o3"]>=35 and b["dist"]<=2 and b["approved"]]
+    avg_g=sum(b["al2o3"] for b in qual)/len(qual) if qual else 0
+    _metrics(
+        (f"Qualified blocks",len(qual),"Ready to schedule"),
+        ("Avg Al₂O₃ (qualified)",f"{avg_g:.1f}%","vs 29% overall avg"),
+        ("Refinery feed target","620 t/hr","Pinjarra digestion demand"),
+        ("Clearing approvals due","2 blocks","DMIRS pending — B-43B, B-44B"),
+        ("Plan prep time saved","70%","2 days → 0.5 day (CoCo)"),
+    )
+    c1,c2=st.columns(2)
+    with c1:
+        colors=[GREEN if b["al2o3"]>=35 and b["dist"]<=2 and b["approved"] else AMBER if b["al2o3"]>=35 else RED for b in BLOCKS]
+        fig=go.Figure(go.Scatter(x=[b["dist"] for b in BLOCKS],y=[b["al2o3"] for b in BLOCKS],
+                                   mode="markers",marker=dict(size=[b["area"]*8 for b in BLOCKS],color=colors,opacity=0.85),
+                                   text=[b["id"] for b in BLOCKS],
+                                   hovertemplate="<b>%{text}</b><br>Al₂O₃: %{y:.1f}%<br>Distance: %{x:.1f} km<extra></extra>"))
+        fig.add_hline(y=35,line_dash="dash",line_color=AMBER,line_width=1.5)
+        fig.add_vline(x=2, line_dash="dash",line_color=AMBER,line_width=1.5)
+        fig.update_layout(**CHART_LAYOUT,height=260,title=dict(text="Block grade vs distance (bubble = area ha)",font=dict(color=TXT,size=13)),
+                          xaxis=dict(**_ax(),title=dict(text="Distance from crusher (km)",font=dict(color=MUTED,size=10))),
+                          yaxis=dict(**_ax(),title=dict(text="Al₂O₃ grade (%)",font=dict(color=MUTED,size=10))),showlegend=False)
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        ids=[b["id"] for b in BLOCKS]
+        fig2=go.Figure()
+        fig2.add_trace(go.Bar(name="Al₂O₃ %",x=ids,y=[b["al2o3"] for b in BLOCKS],marker_color=[GREEN if b["al2o3"]>=35 else AMBER for b in BLOCKS]))
+        fig2.add_trace(go.Bar(name="RSi %×5",x=ids,y=[b["rsi"]*5 for b in BLOCKS], marker_color=[RED if b["rsi"]>3 else AMBER for b in BLOCKS],opacity=0.7))
+        fig2.update_layout(**CHART_LAYOUT,barmode="group",height=260,title=dict(text="Block grade — Al₂O₃ vs reactive silica",font=dict(color=TXT,size=13)),
+                           xaxis=_ax(False),yaxis=_ax(),legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**📋 Block schedule — next 7 days**")
+        for b in BLOCKS:
+            sc=GREEN if b["status"]=="Cleared" else CYAN if b["status"]=="Drilled" else AMBER
+            ca,cb,cc,cd,ce,cf,cg,ch=st.columns([1,1,1,1,1,1.2,1,1])
+            ca.markdown(f"**{b['id']}**")
+            cb.markdown(f"<span style='color:{CYAN}'>{b['al2o3']}%</span>",unsafe_allow_html=True)
+            cc.markdown(f"<span style='color:{RED if b['rsi']>3 else MUTED}'>RSi {b['rsi']}%</span>",unsafe_allow_html=True)
+            cd.markdown(f"<span style='color:{MUTED}'>{b['dist']} km</span>",unsafe_allow_html=True)
+            ce.markdown(f"<span style='color:{MUTED}'>{b['area']} ha</span>",unsafe_allow_html=True)
+            cf.markdown(f"<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{b['status']}</span>",unsafe_allow_html=True)
+            cg.markdown(f"<span style='color:{GREEN if b['equip']=='Available' else AMBER}'>{b['equip']}</span>",unsafe_allow_html=True)
+            ch.markdown(f"<span style='color:{GREEN if b['approved'] else RED}'>{'✓ Approved' if b['approved'] else '⚠ Pending'}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PROCESS / MET ENGINEER
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/biotech:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Process / Metallurgical Engineer</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Bayer Process optimisation — ore grade correlation · LIMS vs DCS historian · Digestion parameters</p>",unsafe_allow_html=True)
+    r=_srng2(55); now=datetime.now()
+    hrs24=[now-timedelta(hours=23-i) for i in range(24)]
+    turb=[max(4,min(28,12+(r()-0.5)*8)) for _ in range(24)]
+    rsi_f=[round((2.4+(r()-0.5)*1.2)*10)/10 for _ in range(24)]
+    al2=[round((91+(r()-0.5)*3)*10)/10 for _ in range(24)]
+    r2=_srng2(66)
+    cx=[round((1.5+r2()*3)*10)/10 for _ in range(20)]
+    cy=[round((8+r2()*18)*10)/10 for _ in range(20)]
+    _metrics(
+        ("Al₂O₃ extraction","91.2%","▲ Above 90% target"),
+        ("Reactive silica (feed)","2.8%","⚠ Trending up from 2.1%"),
+        ("Turbidity (overflow)","14.2 NTU","↑ from 12 NTU baseline"),
+        ("Caustic efficiency","94.1%","✓ Normal range"),
+        ("Analysis time saved","80%","6 hrs → 1 hr (CoCo)"),
+    )
+    c1,c2,c3=st.columns(3)
+    with c1:
+        fig=go.Figure(go.Scatter(x=cx,y=cy,mode="markers",marker=dict(size=8,color=CYAN,opacity=0.8),
+                                   hovertemplate="RSi: %{x}%<br>Turbidity: %{y} NTU<extra></extra>"))
+        fig.update_layout(**CHART_LAYOUT,height=235,title=dict(text="RSi in feed vs clarifier turbidity (r=0.82)",font=dict(color=TXT,size=12)),
+                          xaxis=dict(**_ax(),title=dict(text="Reactive silica % in feed",font=dict(color=MUTED,size=10))),
+                          yaxis=dict(**_ax(),title=dict(text="Turbidity (NTU)",font=dict(color=MUTED,size=10))),showlegend=False)
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure(go.Scatter(x=hrs24,y=turb,mode="lines",line=dict(color=AMBER,width=2),fill="tozeroy",fillcolor="rgba(245,158,11,0.08)"))
+        fig2.add_hline(y=20,line_dash="dash",line_color=RED,line_width=1.5)
+        fig2.update_layout(**CHART_LAYOUT,height=235,title=dict(text="Clarifier turbidity — 24h trend",font=dict(color=TXT,size=12)),
+                           xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with c3:
+        fig3=go.Figure()
+        fig3.add_trace(go.Scatter(x=hrs24,y=al2,mode="lines",name="Al₂O₃ extraction %",line=dict(color=GREEN,width=2)))
+        fig3.add_trace(go.Scatter(x=hrs24,y=rsi_f,mode="lines",name="RSi feed %",yaxis="y2",line=dict(color=RED,width=1.5,dash="dot")))
+        fig3.update_layout(**CHART_LAYOUT,height=235,title=dict(text="Al₂O₃ extraction vs reactive silica",font=dict(color=TXT,size=12)),
+                           xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),
+                           yaxis2=dict(overlaying="y",side="right",tickfont=dict(color=MUTED,size=9),showgrid=False),
+                           legend=dict(font=dict(color=TXT,size=10),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig3,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**🤖 AI Parameter Recommendations**")
+        for param,current,rec,reason,impact in [
+            ("Digestion temperature","145°C","147°C","RSi 3.1% in feed — increase temp to maintain extraction","+0.8% Al₂O₃"),
+            ("Caustic concentration","235 g/L","240 g/L","Elevated reactive silica depleting NaOH faster than nominal","Maintains >90% extraction"),
+            ("Flocculant dose","45 g/t","52 g/t","Turbidity trending up — increase to maintain clarity spec","Turbidity <15 NTU"),
+        ]:
+            with st.container(border=True):
+                ca,cb,cc,cd=st.columns([2,1.5,1.5,2])
+                ca.markdown(f"**{param}**")
+                cb.markdown(f"Current: **{current}**")
+                cc.markdown(f"→ Rec: <span style='color:{GREEN};font-weight:700;'>{rec}</span>",unsafe_allow_html=True)
+                cd.markdown(f"<span style='background:rgba(16,185,129,0.15);color:{GREEN};padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{impact}</span>",unsafe_allow_html=True)
+                st.caption(reason)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  GEOLOGIST
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/terrain:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Geologist / Resource Modeller</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Block model grade reconciliation · F1/F2/F3 accuracy · Mine-to-mill tracking — Huntly Mine</p>",unsafe_allow_html=True)
+    GBLOCKS=[
+        dict(id="B-42A",pred=38.4,bh=38.2,crush=37.8,ref=37.1,pred_rsi=2.0,bh_rsi=2.1,f1=0.995,f2=0.983,f3=0.967),
+        dict(id="B-42B",pred=36.5,bh=36.8,crush=36.2,ref=35.7,pred_rsi=2.9,bh_rsi=2.8,f1=1.008,f2=0.993,f3=0.978),
+        dict(id="B-43A",pred=34.8,bh=34.1,crush=33.5,ref=32.9,pred_rsi=3.2,bh_rsi=3.4,f1=0.980,f2=0.963,f3=0.945),
+        dict(id="B-43B",pred=40.1,bh=39.4,crush=38.8,ref=38.1,pred_rsi=1.8,bh_rsi=1.9,f1=0.983,f2=0.967,f3=0.950),
+        dict(id="B-45A",pred=38.0,bh=40.1,crush=39.4,ref=38.6,pred_rsi=2.2,bh_rsi=1.7,f1=1.055,f2=1.037,f3=1.016),
+        dict(id="B-45B",pred=35.2,bh=35.5,crush=34.9,ref=34.3,pred_rsi=2.5,bh_rsi=2.6,f1=1.009,f2=0.991,f3=0.974),
+    ]
+    ids=[b["id"] for b in GBLOCKS]
+    avg_f1=sum(b["f1"] for b in GBLOCKS)/len(GBLOCKS)
+    flagged=sum(1 for b in GBLOCKS if abs(b["f1"]-1)>0.03)
+    qtrs=["Q3 2025","Q4 2025","Q1 2026","Q2 2026"]
+    _metrics(
+        ("Avg model F1 factor",f"{avg_f1:.3f}","F1=1.000 = perfect"),
+        ("Blocks flagged",flagged,"|F1−1.0| >3% = systematic bias"),
+        ("Reconciliation cycle","1.5 days","70% faster vs 5-day manual"),
+        ("Active drill blocks","6","Current quarter schedule"),
+    )
+    c1,c2=st.columns(2)
+    with c1:
+        fig=go.Figure()
+        for ys,nm,col in [([b["pred"] for b in GBLOCKS],"Predicted",MUTED),
+                           ([b["bh"] for b in GBLOCKS],"Blast-hole",CYAN),
+                           ([b["crush"] for b in GBLOCKS],"Crusher",AMBER),
+                           ([b["ref"] for b in GBLOCKS],"Refinery head",GREEN)]:
+            fig.add_trace(go.Scatter(x=ids,y=ys,mode="lines+markers",name=nm,line=dict(color=col,width=2),marker=dict(size=7)))
+        fig.update_layout(**CHART_LAYOUT,height=260,title=dict(text="Al₂O₃ grade reconciliation",font=dict(color=TXT,size=13)),
+                          xaxis=_ax(False),yaxis=dict(**_ax(),title=dict(text="Al₂O₃ %",font=dict(color=MUTED,size=10))),
+                          legend=dict(font=dict(color=TXT,size=10),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure()
+        for ys,nm,col in [([0.988,0.992,0.985,0.994],"F1 (mine/model)",CYAN),
+                           ([0.971,0.978,0.968,0.976],"F2 (mill/mine)",AMBER),
+                           ([0.952,0.961,0.949,0.958],"F3 (refinery/mill)",GREEN)]:
+            fig2.add_trace(go.Scatter(x=qtrs,y=ys,mode="lines+markers",name=nm,line=dict(color=col,width=2),marker=dict(size=8)))
+        fig2.add_hline(y=1.0,line_dash="dot",line_color=MUTED,line_width=1)
+        fig2.update_layout(**CHART_LAYOUT,height=260,title=dict(text="F1/F2/F3 factors — quarterly trend",font=dict(color=TXT,size=13)),
+                           xaxis=_ax(False),yaxis=dict(**_ax(),range=[0.93,1.07]),
+                           legend=dict(font=dict(color=TXT,size=10),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**📊 Block grade reconciliation table — Q2 2026**")
+        hdr=st.columns([1,1,1,1,1,1,1,1,1,1,1])
+        for col,h in zip(hdr,["Block","Pred Al₂O₃","BH Al₂O₃","Crusher","Refinery","Pred RSi","BH RSi","F1","F2","F3","Flag"]):
+            col.markdown(f"<span style='color:{MUTED};font-size:0.72rem;font-weight:700;text-transform:uppercase;'>{h}</span>",unsafe_allow_html=True)
+        for b in GBLOCKS:
+            flag=abs(b["f1"]-1)>0.03
+            row=st.columns([1,1,1,1,1,1,1,1,1,1,1])
+            fc=RED if flag else TXT
+            vals=[
+                (f"**{b['id']}**",fc),(f"{b['pred']}%",MUTED),(f"{b['bh']}%",TXT),
+                (f"{b['crush']}%",TXT),(f"{b['ref']}%",TXT),(f"{b['pred_rsi']}%",MUTED),
+                (f"{b['bh_rsi']}%",RED if b['bh_rsi']>3 else TXT),
+                (f"{b['f1']:.3f}",RED if abs(b['f1']-1)>0.03 else AMBER if abs(b['f1']-1)>0.015 else GREEN),
+                (f"{b['f2']:.3f}",MUTED),(f"{b['f3']:.3f}",MUTED),
+                ("⚠ Review" if flag else "✓",RED if flag else GREEN),
+            ]
+            for col,(txt,c) in zip(row,vals):
+                col.markdown(f"<span style='color:{c};font-weight:700;'>{txt}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  MAINTENANCE — MOBILE FLEET
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/local_shipping:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Maintenance Supervisor — Mobile Fleet</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Haul trucks · Excavators · Drill rigs · Preventive maintenance scheduling — Huntly Mine</p>",unsafe_allow_html=True)
+    FLEET=[
+        dict(id="T-01",tp="Haul Truck",hrs=482,iv=500,oil="Pass",vib="Normal",status="Monitor",next=3),
+        dict(id="T-02",tp="Haul Truck",hrs=498,iv=500,oil="Pass",vib="Normal",status="Service due",next=1),
+        dict(id="T-03",tp="Haul Truck",hrs=314,iv=500,oil="Pass",vib="Normal",status="Normal",next=37),
+        dict(id="T-07",tp="Haul Truck",hrs=256,iv=500,oil="Fail",vib="Normal",status="Oil alert",next=14),
+        dict(id="T-11",tp="Haul Truck",hrs=461,iv=500,oil="Pass",vib="Elevated",status="Monitor",next=8),
+        dict(id="EX-01",tp="Excavator",hrs=1840,iv=2000,oil="Pass",vib="Normal",status="Normal",next=32),
+        dict(id="EX-02",tp="Excavator",hrs=1974,iv=2000,oil="Pass",vib="Normal",status="Monitor",next=4),
+        dict(id="DR-01",tp="Drill Rig",hrs=720,iv=750,oil="Pass",vib="Normal",status="Monitor",next=10),
+        dict(id="DR-02",tp="Drill Rig",hrs=748,iv=750,oil="Pass",vib="Elevated",status="Service due",next=1),
+        dict(id="WC-01",tp="Water Cart",hrs=312,iv=400,oil="Pass",vib="Normal",status="Normal",next=22),
+    ]
+    SC4={"Normal":GREEN,"Monitor":AMBER,"Service due":RED,"Oil alert":RED}
+    urgent=sum(1 for f in FLEET if f["next"]<=7)
+    _metrics(
+        ("Service due ≤7 days",urgent,"Across all mobile fleet"),
+        ("Fleet active","38/42","4 in planned maintenance"),
+        ("Oil analysis alerts","1","T-07 — sample failure"),
+        ("Vib alerts","2","T-11, DR-02 elevated"),
+        ("Planning time saved","60%","3 hrs → 1 hr/week"),
+    )
+    sf=sorted(FLEET,key=lambda f:f["next"])
+    c1,c2=st.columns(2)
+    with c1:
+        ds=[f["next"] for f in sf]; aids=[f["id"] for f in sf]
+        fig=go.Figure(go.Bar(y=aids,x=ds,orientation="h",
+                               marker_color=[RED if d<=3 else AMBER if d<=7 else GREEN for d in ds],
+                               text=[f"{d}d" for d in ds],textposition="outside",textfont=dict(color=TXT,size=10)))
+        fig.add_vline(x=7,line_dash="dash",line_color=AMBER,line_width=1.5)
+        fig.update_layout(**CHART_LAYOUT,height=280,title=dict(text="Days until next service interval",font=dict(color=TXT,size=13)),
+                          xaxis=dict(**_ax(),range=[0,45]),yaxis=_ax(False),showlegend=False)
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        f8=FLEET[:8]
+        fig2=go.Figure()
+        fig2.add_trace(go.Bar(name="Engine hours",x=[f["id"] for f in f8],y=[f["hrs"] for f in f8],
+                               marker_color=[RED if f["hrs"]/f["iv"]>0.95 else AMBER if f["hrs"]/f["iv"]>0.85 else GREEN for f in f8]))
+        fig2.add_trace(go.Scatter(name="Service interval",x=[f["id"] for f in f8],y=[f["iv"] for f in f8],
+                                   mode="lines",line=dict(color=MUTED,dash="dash",width=1.5)))
+        fig2.update_layout(**CHART_LAYOUT,barmode="overlay",height=280,title=dict(text="Engine hours vs service interval",font=dict(color=TXT,size=13)),
+                           xaxis=_ax(False),yaxis=_ax(),legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**🔧 Fleet maintenance register**")
+        for f in FLEET:
+            pct=f["hrs"]/f["iv"]; sc=SC4[f["status"]]
+            ca,cb,cc,cd,ce,cf,cg=st.columns([1,1.5,1.5,3,1,1.2,1])
+            ca.markdown(f"**{f['id']}**")
+            cb.markdown(f"<span style='color:{MUTED}'>{f['tp']}</span>",unsafe_allow_html=True)
+            cc.markdown(f"<span style='color:{MUTED}'>{f['hrs']}/{f['iv']} hrs</span>",unsafe_allow_html=True)
+            cd.progress(min(1.0,pct))
+            ce.markdown(f"<span style='color:{RED if f['oil']=='Fail' else GREEN}'>Oil:{f['oil']}</span>",unsafe_allow_html=True)
+            cf.markdown(f"<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{f['status']}</span>",unsafe_allow_html=True)
+            cg.markdown(f"<span style='color:{RED if f['next']<=7 else AMBER if f['next']<=14 else MUTED}'>{f['next']}d</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  RELIABILITY ENGINEER
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/build:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Reliability Engineer</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Asset health · Vibration trending · Predictive maintenance — Huntly & Pinjarra</p>",unsafe_allow_html=True)
+    def _gvib(seed,base,drift):
+        rng=_srng2(seed); v=[base]
+        for _ in range(89):
+            v.append(max(1.5,min(12,v[-1]+(rng()-0.48)*0.12+drift*0.01)))
+        return [round(x*100)/100 for x in v]
+    now=datetime.now(); d90=[now-timedelta(days=89-i) for i in range(90)]
+    vib_c2=_gvib(42,3.2,1.2); vib_c1=_gvib(55,2.8,0.3); vib_kln=_gvib(66,4.1,0.5)
+    ASSETS=[
+        dict(id="C1",name="Primary Crusher 1",tp="Jaw Crusher",loc="Huntly Mine",health=92,vib=round(vib_c1[-1],2),motor=79,liner=68,next="14 days",mtbf=142,last="94 days ago",status="Normal",risk=12),
+        dict(id="C2",name="Primary Crusher 2",tp="Jaw Crusher",loc="Huntly Mine",health=61,vib=round(vib_c2[-1],2),motor=88,liner=91,next="3 days", mtbf=142,last="41 days ago",status="Warning",risk=68),
+        dict(id="KLN1",name="Rotary Kiln 1",  tp="Calcination Kiln",loc="Pinjarra",health=85,vib=4.1,motor=82,liner=54,next="28 days",mtbf=210,last="188 days ago",status="Normal",risk=18),
+        dict(id="KLN2",name="Rotary Kiln 2",  tp="Calcination Kiln",loc="Pinjarra",health=78,vib=5.8,motor=85,liner=77,next="9 days", mtbf=210,last="64 days ago", status="Monitor",risk=41),
+        dict(id="OC1",name="Overland Conveyor",tp="Belt Conveyor",loc="Huntly→Pinjarra",health=96,vib=1.8,motor=71,liner=22,next="45 days",mtbf=380,last="312 days ago",status="Normal",risk=4),
+        dict(id="THK1",name="Primary Thickener",tp="Gravity Thickener",loc="Pinjarra",health=88,vib=2.3,motor=68,liner=45,next="21 days",mtbf=95,last="78 days ago",status="Normal",risk=9),
+    ]
+    SC5={"Normal":GREEN,"Monitor":AMBER,"Warning":RED,"Critical":RED}
+    critical=sum(1 for a in ASSETS if a["status"] in ("Warning","Critical"))
+    _metrics(
+        ("Asset health avg",f"{sum(a['health'] for a in ASSETS)//len(ASSETS)}%","Across all critical fixed plant"),
+        ("Maint. due ≤14 days",sum(1 for a in ASSETS if any(d in a['next'] for d in ['3','9'])),"Scheduled windows"),
+        ("Est. unplanned cost","$68K","If C2 fails unplanned"),
+        ("MTBF improvement","+23%","vs prior 12 months"),
+    )
+    if critical>0:
+        st.error(f"⚠️ **Crusher 2 Main Bearing — Predicted failure in 8–14 days.** Vibration at {vib_c2[-1]} mm/s. Liner wear 91%. Recommend planned shutdown within 72 hrs.")
+    c1,c2=st.columns(2)
+    with c1:
+        fig=go.Figure()
+        fig.add_trace(go.Scatter(x=d90,y=vib_c2, mode="lines",name="Crusher 2",   line=dict(color=RED,width=2)))
+        fig.add_trace(go.Scatter(x=d90,y=vib_c1, mode="lines",name="Crusher 1",   line=dict(color=GREEN,width=1.5)))
+        fig.add_trace(go.Scatter(x=d90,y=vib_kln,mode="lines",name="Kiln 1 drive",line=dict(color=AMBER,width=1.5)))
+        fig.add_hline(y=7,line_dash="dash",line_color=RED,line_width=1.5,annotation_text="Alert threshold",annotation_font=dict(color=RED,size=10))
+        fig.update_layout(**CHART_LAYOUT,height=250,title=dict(text="Bearing vibration — 90-day trend (mm/s)",font=dict(color=TXT,size=13)),
+                          xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),
+                          legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure(go.Bar(y=[a["id"] for a in ASSETS],x=[a["health"] for a in ASSETS],orientation="h",
+                               marker_color=[GREEN if a["health"]>85 else AMBER if a["health"]>70 else RED for a in ASSETS],
+                               text=[f"{a['health']}%" for a in ASSETS],textposition="inside",textfont=dict(color="white",size=11)))
+        fig2.add_vline(x=75,line_dash="dash",line_color=AMBER,line_width=1.5)
+        fig2.update_layout(**CHART_LAYOUT,height=250,title=dict(text="Asset health index (%)",font=dict(color=TXT,size=13)),
+                           xaxis=dict(**_ax(),range=[0,105]),yaxis=_ax(False),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**🔧 Asset Health Register**")
+        for a in ASSETS:
+            sc=SC5[a["status"]]
+            with st.container(border=True):
+                ca,cb=st.columns([4,1])
+                with ca:
+                    st.markdown(f"**{a['name']}** &nbsp;<span style='color:{MUTED};font-size:0.78rem;'>{a['tp']} · {a['loc']}</span> &nbsp;<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:700;'>{a['status']}</span>",unsafe_allow_html=True)
+                    cols=st.columns(6)
+                    for col,(lbl,val,c) in zip(cols,[
+                        ("Health",f"{a['health']}%",GREEN if a['health']>85 else AMBER if a['health']>70 else RED),
+                        ("Vibration",f"{a['vib']} mm/s",RED if a['vib']>6 else AMBER if a['vib']>4 else GREEN),
+                        ("Motor",f"{a['motor']}%",MUTED),("Liner",f"{a['liner']}%",RED if a['liner']>85 else AMBER if a['liner']>70 else GREEN),
+                        ("MTBF",f"{a['mtbf']}d",CYAN),("Next maint",a['next'],MUTED),
+                    ]):
+                        col.markdown(f"<div style='font-size:0.7rem;color:{MUTED};text-transform:uppercase;'>{lbl}</div><div style='color:{c};font-weight:600;'>{val}</div>",unsafe_allow_html=True)
+                with cb:
+                    rc=RED if a["risk"]>50 else AMBER if a["risk"]>25 else GREEN
+                    st.markdown(f"Last fail: {a['last']}<br><span style='color:{rc};font-weight:700;'>Risk: {a['risk']}/100</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SUPPLY CHAIN PLANNER
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/inventory_2:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Supply Chain / Logistics Planner</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Refinery output · Rail schedule · Port stockpile · Vessel schedule · Demurrage risk — Bunbury</p>",unsafe_allow_html=True)
+    r=_srng2(33); now=datetime.now()
+    days7=[(now-timedelta(days=6-i)).strftime("%a") for i in range(7)]
+    siloP=[round(72+r()*18) for _ in range(7)]; siloW=[round(68+r()*20) for _ in range(7)]
+    portBin=[41200,38800,46100]
+    VESSELS=[
+        dict(name="MV Pinjarra Star", eta="6h",    vol=86400,cap=89000,status="Loading",  dem=False),
+        dict(name="MV Alcoa Pacific", eta="4d 18h",vol=82100,cap=84000,status="En route", dem=False),
+        dict(name="MV Bunbury Bulker",eta="1d 15h",vol=0,    cap=82000,status="Inbound",  dem=False),
+        dict(name="MV Southern Cross",eta="8d 6h", vol=77900,cap=80000,status="En route", dem=False),
+        dict(name="MV Wagerup Spirit",eta="4h",    vol=0,    cap=78000,status="At anchor",dem=True),
+    ]
+    tp=sum(portBin); demR=sum(1 for v in VESSELS if v["dem"])
+    _metrics(
+        ("Port stockpile total",f"{tp/1000:.1f}kt","3 bins × 50,000t capacity"),
+        ("Bin utilisation",f"{round(tp/150000*100)}%","Combined 150,000t"),
+        ("Demurrage risk",f"{demR} vessel" if demR>0 else "None","⚠ ~$10K/day" if demR>0 else "All on schedule"),
+        ("Rail on schedule","3/3 consists","All dispatch windows met"),
+        ("Demurrage savings","40%","vs pre-CoCo baseline"),
+    )
+    if demR>0:
+        st.error("⚠️ **Demurrage accruing — MV Wagerup Spirit at anchor 4h+.** Est. ~$10,000/day.")
+    c1,c2=st.columns([2,1])
+    with c1:
+        fig=go.Figure()
+        fig.add_trace(go.Bar(name="Pinjarra silo %",x=days7,y=siloP,marker_color=CYAN,opacity=0.8))
+        fig.add_trace(go.Bar(name="Wagerup silo %", x=days7,y=siloW,marker_color=AMBER,opacity=0.8))
+        fig.add_hline(y=85,line_dash="dash",line_color=RED,line_width=1.5)
+        fig.update_layout(**CHART_LAYOUT,barmode="group",height=230,title=dict(text="Refinery silo levels — 7-day trend (%)",font=dict(color=TXT,size=13)),
+                          xaxis=_ax(False),yaxis=dict(**_ax(),range=[0,105]),legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure(go.Bar(x=["Bin A","Bin B","Bin C"],y=portBin,
+                               marker_color=[RED if v>45000 else AMBER if v>40000 else GREEN for v in portBin],
+                               text=[f"{v/1000:.0f}kt" for v in portBin],textposition="inside",textfont=dict(color="white",size=11)))
+        fig2.add_hline(y=50000,line_dash="dash",line_color=RED,line_width=1.5)
+        fig2.update_layout(**CHART_LAYOUT,height=230,title=dict(text="Bunbury port bins (t)",font=dict(color=TXT,size=13)),
+                           xaxis=_ax(False),yaxis=dict(**_ax(),range=[0,52000]),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**🚢 Vessel schedule — next 14 days**")
+        for v in VESSELS:
+            sc=RED if v["dem"] else GREEN
+            ca,cb,cc,cd,ce=st.columns([2,1,2,1.5,1.5])
+            ca.markdown(f"**{v['name']}**")
+            cb.markdown(f"<span style='color:{MUTED}'>ETA: {v['eta']}</span>",unsafe_allow_html=True)
+            vol_str2 = f"{v['vol']/1000:.0f}kt alumina" if v['vol']>0 else 'Ballast'
+            vol_col2 = GREEN if v['vol']>0 else MUTED
+            cc.markdown(f"<span style='color:{vol_col2}'>{vol_str2}</span>",unsafe_allow_html=True)
+            if v["vol"]>0: cd.progress(round(v["vol"]/v["cap"]*100)/100)
+            ce.markdown(f"<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{'⚠ Demurrage' if v['dem'] else v['status']}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  TRAIN / PORT COORDINATOR
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/anchor:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Train / Port Loadout Coordinator</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Silo levels · Rail dispatch · Port stockpile · 48-hour schedule — Pinjarra, Wagerup & Bunbury</p>",unsafe_allow_html=True)
+    r=_srng2(88); now=datetime.now()
+    hrs48=[now-timedelta(hours=47-i) for i in range(48)]
+    sp48=[round(70+r()*20) for _ in range(48)]; sw48=[round(65+r()*25) for _ in range(48)]
+    pf=[round(82000+r()*10000) for _ in range(48)]
+    DISP=[
+        dict(id="PJR-001",orig="Pinjarra",dep="06:00",arr="07:30",pay=2110,mois=0.05,stat="Departed"),
+        dict(id="PJR-002",orig="Pinjarra",dep="09:45",arr="11:15",pay=2085,mois=0.06,stat="Loading"),
+        dict(id="PJR-003",orig="Pinjarra",dep="13:30",arr="15:00",pay=2100,mois=0.04,stat="Scheduled"),
+        dict(id="WGR-001",orig="Wagerup", dep="07:15",arr="07:55",pay=2090,mois=0.07,stat="Arrived"),
+        dict(id="WGR-002",orig="Wagerup", dep="10:00",arr="10:40",pay=2075,mois=0.06,stat="Loading"),
+        dict(id="WGR-003",orig="Wagerup", dep="14:00",arr="14:40",pay=0,   mois=None,stat="Scheduled"),
+    ]
+    dispatched=sum(1 for d in DISP if d["stat"] in ("Departed","Arrived"))
+    totalPay=sum(d["pay"] for d in DISP if d["pay"]>0)
+    _metrics(
+        ("Trains dispatched today",f"{dispatched}/6","Pinjarra + Wagerup"),
+        ("Total payload today",f"{totalPay/1000:.1f}kt","Alumina dispatched"),
+        ("Port bin utilisation","83%","124,000t of 150,000t"),
+        ("Moisture compliance","6/6 ✓","All below 0.5% IMO limit"),
+        ("Rail idle time saved","50%","vs whiteboard scheduling"),
+    )
+    x48=hrs48[::4]
+    c1,c2=st.columns(2)
+    with c1:
+        fig=go.Figure()
+        fig.add_trace(go.Scatter(x=x48,y=sp48[::4],mode="lines",name="Pinjarra silo %",line=dict(color=CYAN,width=2)))
+        fig.add_trace(go.Scatter(x=x48,y=sw48[::4],mode="lines",name="Wagerup silo %", line=dict(color=AMBER,width=2)))
+        fig.add_hline(y=85,line_dash="dash",line_color=RED,line_width=1.5)
+        fig.update_layout(**CHART_LAYOUT,height=220,title=dict(text="Silo levels — 48h trend (%)",font=dict(color=TXT,size=13)),
+                          xaxis=dict(**_ax(False),showticklabels=False),yaxis=dict(**_ax(),range=[50,100]),
+                          legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure(go.Scatter(x=x48,y=pf[::4],mode="lines",line=dict(color=GREEN,width=2),fill="tozeroy",fillcolor="rgba(16,185,129,0.08)"))
+        fig2.add_hline(y=150000,line_dash="dash",line_color=RED,line_width=1.5)
+        fig2.update_layout(**CHART_LAYOUT,height=220,title=dict(text="Bunbury port inventory (t)",font=dict(color=TXT,size=13)),
+                           xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**🚂 48-hour dispatch schedule**")
+        for d in DISP:
+            sc={"Arrived":GREEN,"Departed":CYAN,"Loading":AMBER,"Scheduled":MUTED}[d["stat"]]
+            oc=CYAN if d["orig"]=="Pinjarra" else AMBER
+            ca,cb,cc,cd,ce,cf,cg=st.columns([1,1,1,1,1.2,1,1.2])
+            ca.markdown(f"**{d['id']}**")
+            cb.markdown(f"<span style='color:{oc}'>{d['orig']}</span>",unsafe_allow_html=True)
+            cc.markdown(f"<span style='color:{MUTED}'>Dep:{d['dep']}</span>",unsafe_allow_html=True)
+            cd.markdown(f"<span style='color:{MUTED}'>Arr:{d['arr']}</span>",unsafe_allow_html=True)
+            pay_str=f"{d['pay']:,}t" if d["pay"]>0 else "Returning"
+            ce.markdown(f"<span style='color:{TXT if d['pay']>0 else MUTED}'>{pay_str}</span>",unsafe_allow_html=True)
+            mois_str=f"H₂O:{d['mois']}%" if d["mois"] is not None else "—"
+            mois_col=GREEN if d["mois"] is not None and d["mois"]<0.5 else RED if d["mois"] is not None else MUTED
+            cf.markdown(f"<span style='color:{mois_col}'>{mois_str}</span>",unsafe_allow_html=True)
+            cg.markdown(f"<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{d['stat']}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PROCUREMENT / WAREHOUSE
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/shopping_cart:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Procurement / Warehouse Manager</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Critical spares · Predictive reorder · Wear-based consumption · Supplier lead times</p>",unsafe_allow_html=True)
+    SPARES=[
+        dict(part="Jaw crusher liner set",        stock=1,mn=2,lead=14,wear=91,  reorder="Overdue",  cost=28000,status="Order now"),
+        dict(part="Haul truck engine filter kit", stock=4,mn=4,lead=3, wear=None,reorder="11 Jun",  cost=480,  status="Low"),
+        dict(part="Conveyor belt splice kit (×2)",stock=3,mn=2,lead=7, wear=22,  reorder="15 Jul",  cost=3200, status="OK"),
+        dict(part="Pump impeller (Warman 4/3)",   stock=2,mn=2,lead=10,wear=58,  reorder="28 Jun",  cost=4800, status="OK"),
+        dict(part="Calciner refractory brick (t)",stock=4,mn=3,lead=21,wear=54,  reorder="20 Jul",  cost=6200, status="OK"),
+        dict(part="Haul truck tyre 27.00R49",     stock=0,mn=1,lead=21,wear=None,reorder="Critical",cost=32000,status="Critical"),
+        dict(part='Drill bit tricone 9⅞"',        stock=8,mn=4,lead=5, wear=None,reorder="2 Aug",   cost=1100, status="OK"),
+        dict(part="Thickener rake arm bearing",   stock=1,mn=1,lead=14,wear=45,  reorder="4 Jul",   cost=2400, status="OK"),
+    ]
+    SC6={"Critical":RED,"Order now":RED,"Low":AMBER,"OK":GREEN}
+    critical=sum(1 for s in SPARES if s["status"] in ("Critical","Order now"))
+    totalVal=sum(s["stock"]*s["cost"] for s in SPARES)
+    months=["Jan","Feb","Mar","Apr","May","Jun"]
+    _metrics(
+        ("Critical stockouts",critical,"⚠ Production risk" if critical>0 else "✓ No stockout risk"),
+        ("Spares inventory value",f"${totalVal/1000:.0f}K","On-hand stock"),
+        ("Items below min stock",sum(1 for s in SPARES if s["stock"]<s["mn"]),"Reorder triggered"),
+        ("Cost reduction","30%","vs reactive ordering baseline"),
+    )
+    if critical>0:
+        with st.container(border=True):
+            st.markdown(f"<span style='color:{RED};font-weight:700;'>🚨 {critical} critical spare issue(s)</span>",unsafe_allow_html=True)
+            for s in SPARES:
+                if s["status"] in ("Critical","Order now"):
+                    st.markdown(f"• **{s['part']}** — Stock: {s['stock']} (min: {s['mn']}) · Lead: {s['lead']}d · ${s['cost']:,}")
+    c1,c2=st.columns(2)
+    with c1:
+        labels=[s["part"][:28]+"…" if len(s["part"])>28 else s["part"] for s in SPARES]
+        vals=[s["stock"]/s["mn"]*100 for s in SPARES]
+        fig=go.Figure(go.Bar(y=labels,x=vals,orientation="h",
+                               marker_color=[SC6[s["status"]] for s in SPARES],
+                               text=[f"{s['stock']}/{s['mn']}" for s in SPARES],textposition="outside",textfont=dict(color=TXT,size=9)))
+        fig.add_vline(x=100,line_dash="dash",line_color=AMBER,line_width=1.5)
+        fig.update_layout(**CHART_LAYOUT,height=300,title=dict(text="Stock level vs minimum (% of min)",font=dict(color=TXT,size=13)),
+                          xaxis=dict(**_ax(),range=[0,220]),yaxis=dict(**_ax(False),tickfont=dict(color=MUTED,size=9)),showlegend=False)
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure()
+        fig2.add_trace(go.Bar(name="Planned spend",x=months,y=[v*1000 for v in [42,38,51,44,48,53]],marker_color=CYAN,opacity=0.7))
+        fig2.add_trace(go.Bar(name="Actual spend", x=months,y=[v*1000 for v in [38,41,49,46,52,58]],marker_color=AMBER,opacity=0.9))
+        fig2.update_layout(**CHART_LAYOUT,barmode="group",height=300,title=dict(text="Monthly procurement spend ($)",font=dict(color=TXT,size=13)),
+                           xaxis=_ax(False),yaxis=_ax(),legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**📦 Critical spares register**")
+        for s in SPARES:
+            sc=SC6[s["status"]]
+            ca,cb,cc,cd,ce,cf=st.columns([3,1.5,1,1.5,1,1.2])
+            ca.markdown(s["part"])
+            cb.markdown(f"Stock:<span style='color:{GREEN if s['stock']>=s['mn'] else RED};font-weight:700;'>{s['stock']}</span>/{s['mn']}",unsafe_allow_html=True)
+            cc.markdown(f"<span style='color:{MUTED}'>Lead:{s['lead']}d</span>",unsafe_allow_html=True)
+            if s["wear"] is not None: cd.progress(s["wear"]/100)
+            ce.markdown(f"<span style='color:{MUTED}'>${s['cost']:,}</span>",unsafe_allow_html=True)
+            cf.markdown(f"<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{s['status']}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  ENVIRONMENTAL ADVISOR
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/eco:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Environmental Advisor</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>EPA licence compliance · Dust, noise, water, rehabilitation — Huntly Mine, WA</p>",unsafe_allow_html=True)
+    r=_srng2(11); now=datetime.now()
+    hrs24=[now-timedelta(hours=23-i) for i in range(24)]
+    pm10=[max(8,min(85,38+(r()-0.5)*36)) for _ in range(24)]
+    pm25=[max(3,min(35,14+(r()-0.5)*16)) for _ in range(24)]
+    noise=[max(42,min(98,72+(r()-0.5)*28)) for _ in range(24)]
+    water=[max(140,min(420,280+(r()-0.5)*120)) for _ in range(24)]
+    REHAB=[
+        dict(zone="Zone 4A",target=65,done=62,status="On track"),
+        dict(zone="Zone 4B",target=40,done=44,status="Ahead"),
+        dict(zone="Zone 5A",target=80,done=68,status="Behind"),
+        dict(zone="Zone 5B",target=30,done=30,status="Complete"),
+        dict(zone="Zone 6A",target=55,done=41,status="Behind"),
+        dict(zone="Zone 6B",target=20,done=20,status="Complete"),
+    ]
+    EPA=[
+        dict(param="PM10 (24-hr avg)",      limit=50, current=38.2,unit="µg/m³",status="Compliant"),
+        dict(param="PM2.5 (24-hr avg)",     limit=25, current=14.1,unit="µg/m³",status="Compliant"),
+        dict(param="Blast noise (dBL)",     limit=115,current=94,  unit="dBL",  status="Compliant"),
+        dict(param="Ground vib (PPV)",      limit=20, current=8.2, unit="mm/s", status="Compliant"),
+        dict(param="Water extraction",      limit=520,current=484, unit="ML/mo",status="Compliant"),
+        dict(param="Rehab ha YTD",          limit=550,current=285, unit="ha",   status="On track"),
+        dict(param="Clearing approval buf.",limit=10, current=8.4, unit="%",    status="Monitor"),
+        dict(param="Haul road dust PM10",   limit=50, current=62,  unit="µg/m³",status="Exceedance"),
+    ]
+    exceedances=sum(1 for e in EPA if e["status"]=="Exceedance")
+    avgPM10=sum(pm10)/len(pm10)
+    totalRehab=sum(r["done"] for r in REHAB); totalTarget=sum(r["target"] for r in REHAB)
+    _metrics(
+        ("EPA exceedances",exceedances,"⚠️ Action required" if exceedances>0 else "✓ All within limits"),
+        ("PM10 24-hr avg",f"{avgPM10:.1f} µg/m³","Limit: 50 µg/m³"),
+        ("Rehab YTD",f"{totalRehab} ha",f"Target: {totalTarget} ha"),
+        ("Water use MTD","484 ML","Limit: 520 ML/month"),
+        ("Fauna detections","3","Last 24 hrs"),
+        ("Active blast notices","1","Zone 5A — 14:00 today"),
+    )
+    if exceedances>0:
+        st.error("⚠️ **EPA Exceedance — Haul Road PM10:** 62 µg/m³ (limit 50). Water cart dispatched. If sustained >2 hrs, blast program must be suspended.")
+    c1,c2=st.columns(2)
+    with c1:
+        fig=go.Figure()
+        fig.add_trace(go.Scatter(x=hrs24,y=pm10,mode="lines",name="PM10", line=dict(color=AMBER,width=2),fill="tozeroy",fillcolor="rgba(245,158,11,0.08)"))
+        fig.add_trace(go.Scatter(x=hrs24,y=pm25,mode="lines",name="PM2.5",line=dict(color=CYAN,width=2)))
+        fig.add_hline(y=50,line_dash="dash",line_color=RED,line_width=1.5,annotation_text="EPA limit 50",annotation_font=dict(color=RED,size=10))
+        fig.update_layout(**CHART_LAYOUT,height=220,title=dict(text="Dust — PM10/PM2.5 (µg/m³)",font=dict(color=TXT,size=13)),
+                          xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure(go.Scatter(x=hrs24,y=noise,mode="lines",line=dict(color="#7C3AED",width=2),fill="tozeroy",fillcolor="rgba(124,58,237,0.08)"))
+        fig2.add_hline(y=115,line_dash="dash",line_color=RED,line_width=1.5,annotation_text="EPA limit",annotation_font=dict(color=RED,size=10))
+        fig2.update_layout(**CHART_LAYOUT,height=220,title=dict(text="Community noise (dBL)",font=dict(color=TXT,size=13)),
+                           xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    c1,c2=st.columns([2,1])
+    with c1:
+        fig3=go.Figure()
+        fig3.add_trace(go.Bar(name="Completed",x=[r["zone"] for r in REHAB],y=[r["done"] for r in REHAB],
+                               marker_color=[GREEN if r["done"]>=r["target"] else AMBER if r["done"]/r["target"]>0.85 else RED for r in REHAB]))
+        fig3.add_trace(go.Bar(name="Target",   x=[r["zone"] for r in REHAB],y=[r["target"] for r in REHAB],marker_color="rgba(148,163,184,0.25)"))
+        fig3.update_layout(**CHART_LAYOUT,barmode="overlay",height=230,title=dict(text="Rehabilitation progress by zone (ha)",font=dict(color=TXT,size=13)),
+                           xaxis=_ax(False),yaxis=_ax(),legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig3,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig4=go.Figure(go.Bar(x=hrs24[::4],y=water[::4],marker_color=BLUE,opacity=0.8))
+        fig4.update_layout(**CHART_LAYOUT,height=230,title=dict(text="Haul road water use (kL/hr)",font=dict(color=TXT,size=13)),
+                           xaxis=dict(**_ax(False),showticklabels=False),yaxis=_ax(),showlegend=False)
+        st.plotly_chart(fig4,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**📋 EPA Licence Compliance**")
+        SC7={"Compliant":(GREEN,"✓"),"On track":(GREEN,"✓"),"Ahead":(CYAN,"▲"),"Monitor":(AMBER,"⚠"),"Behind":(AMBER,"↓"),"Exceedance":(RED,"✗"),"Complete":(BLUE,"●")}
+        for e in EPA:
+            col,sym=SC7.get(e["status"],(MUTED,"?"))
+            ca,cb,cc,cd,ce=st.columns([3,2,1.5,2,1.5])
+            ca.markdown(e["param"])
+            cb.progress(min(1.0,e["current"]/e["limit"]))
+            cc.markdown(f"{e['current']} {e['unit']}")
+            cd.markdown(f"<span style='color:{MUTED}'>limit: {e['limit']} {e['unit']}</span>",unsafe_allow_html=True)
+            ce.markdown(f"<span style='background:{col}22;color:{col};padding:1px 8px;border-radius:10px;font-size:0.75rem;font-weight:700;'>{sym} {e['status']}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SAFETY / HSE MANAGER
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/security:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Safety / HSE Manager</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Incident tracking · Fatigue management · Proximity alerts · Training compliance — Huntly Mine</p>",unsafe_allow_html=True)
+    months=["Jan","Feb","Mar","Apr","May","Jun"]
+    inc_m=[1,0,2,1,0,1]; nm_m=[3,2,4,2,1,3]; dl=[1,0,3,1,0,0]
+    INCIDENTS=[
+        dict(id="INC-2026-047",sev="High",  tp="Near-miss",date="2026-06-09",time="10:34",loc="Pit 4 haul road",
+             desc="Haul truck T07 vs water cart — <3m clearance at blind crest. Operator fatigue 82%.",status="Investigation open",dl=0),
+        dict(id="INC-2026-041",sev="Medium",tp="Spill",    date="2026-06-03",time="14:22",loc="S5 digestion area",
+             desc="NaOH caustic spill — 20L from cracked pipe coupling. Contained within bund.",status="Closed",dl=0),
+        dict(id="INC-2026-038",sev="Low",   tp="LTI",      date="2026-05-28",time="09:15",loc="Maintenance workshop",
+             desc="Hand laceration — chip from angle grinder. 1 day lost time.",status="Closed",dl=1),
+        dict(id="INC-2026-031",sev="High",  tp="Near-miss",date="2026-05-14",time="16:48",loc="ROM pad",
+             desc="Excavator swing hazard — GRD-01 in blind spot during face-cleaning pass.",status="Closed",dl=0),
+    ]
+    SC8={"High":RED,"Medium":AMBER,"Low":MUTED}; SC9={"Investigation open":RED,"Closed":GREEN}
+    openInc=sum(1 for i in INCIDENTS if i["status"]=="Investigation open")
+    PERSONNEL=[dict(name=f"Operator {i:03d}",role="Haul Truck",zone="Pit 4",fatigue=50+i%45,hours=i%12+6) for i in range(42)]
+    HIGH_FAT=[p for p in PERSONNEL if p["fatigue"]>70]
+    _metrics(
+        ("Days since LTI","41","Last: 1-day laceration (May 28)"),
+        ("Open investigations",openInc,"⚠️ INC-2026-047 critical" if openInc>0 else "✓ All closed"),
+        ("High-fatigue personnel",len(HIGH_FAT),"Score >70% on fatigue index"),
+        ("Training overdue","6","Hazard awareness & certs"),
+        ("Proximity alerts today","7","3 high-severity"),
+        ("Active personnel",len(PERSONNEL),f"{len(PERSONNEL)} on site"),
+    )
+    st.error("🚨 **Open Investigation — INC-2026-047.** Haul truck T07 vs water cart — Pit 4, 10:34 AWST. Operator fatigue 82%. Report due 2026-06-10.")
+    c1,c2=st.columns(2)
+    with c1:
+        fig=go.Figure()
+        fig.add_trace(go.Bar(name="Recordable incidents",x=months,y=inc_m,marker_color=RED,opacity=0.8))
+        fig.add_trace(go.Bar(name="Near-misses",         x=months,y=nm_m, marker_color=AMBER,opacity=0.8))
+        fig.update_layout(**CHART_LAYOUT,barmode="group",height=240,title=dict(text="2026 incident trend",font=dict(color=TXT,size=13)),
+                          xaxis=_ax(False),yaxis=_ax(),legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure(go.Bar(x=months,y=dl,marker_color=[RED if d>3 else AMBER if d>1 else GREEN for d in dl],
+                               text=[str(d) for d in dl],textposition="outside",textfont=dict(color=TXT,size=11)))
+        fig2.update_layout(**CHART_LAYOUT,height=240,title=dict(text="Lost time days by month",font=dict(color=TXT,size=13)),
+                           xaxis=_ax(False),yaxis=_ax(),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**📋 Incident Register (last 30 days)**")
+        for inc in INCIDENTS:
+            sc=SC8[inc["sev"]]; st2=SC9[inc["status"]]
+            with st.container(border=True):
+                ca,cb=st.columns([5,1])
+                ca.markdown(f"**{inc['id']}** &nbsp;<span style='background:{sc}22;color:{sc};padding:1px 8px;border-radius:10px;font-size:0.72rem;font-weight:700;'>{inc['sev']} · {inc['tp']}</span> &nbsp;<span style='color:{MUTED};font-size:0.78rem;'>{inc['date']} {inc['time']} · {inc['loc']}</span>",unsafe_allow_html=True)
+                ca.markdown(inc["desc"])
+                cb.markdown(f"<span style='color:{st2};font-weight:600;'>{'🔴' if inc['status']=='Investigation open' else '🟢'} {inc['status']}</span>",unsafe_allow_html=True)
+                if inc["dl"]>0: cb.markdown(f"<span style='color:{RED}'>{inc['dl']} day(s) lost</span>",unsafe_allow_html=True)
+    c1,c2=st.columns(2)
+    with c1:
+        with st.container(border=True):
+            st.markdown(f"**😴 Fatigue Management — {len(HIGH_FAT)} flagged**")
+            shown=0
+            for p in PERSONNEL:
+                if p["fatigue"]>55 and shown<6:
+                    fc=RED if p["fatigue"]>70 else AMBER
+                    st.markdown(f"<span style='color:{TXT}'>{p['name']}</span> &nbsp;<span style='color:{MUTED};font-size:0.78rem;'>{p['role']} · {p['hours']}h</span>",unsafe_allow_html=True)
+                    st.progress(p["fatigue"]/100)
+                    shown+=1
+            if HIGH_FAT: st.error(f"⚠️ {len(HIGH_FAT)} operator(s) above 70% — mandatory rest required")
+    with c2:
+        with st.container(border=True):
+            st.markdown("**📍 Proximity Alerts Today**")
+            for time_,assets,loc,sev,dist in [
+                ("10:34","T07 + WC-03","Pit 4 crest","High","< 3m"),
+                ("08:12","T03 + EX-02","Pit 3 access","Medium","8m"),
+                ("07:45","GRD-01 + T11","ROM pad entry","Low","12m"),
+            ]:
+                sc=RED if sev=="High" else AMBER if sev=="Medium" else MUTED
+                ca,cb,cc,cd=st.columns([1,1.5,2,1])
+                ca.markdown(f"<span style='color:{MUTED}'>{time_}</span>",unsafe_allow_html=True)
+                cb.markdown(f"<span style='color:{sc};font-weight:700;'>{sev}</span>",unsafe_allow_html=True)
+                cc.markdown(f"{assets} · {loc}")
+                cd.markdown(f"<span style='color:{sc};font-weight:700;'>{dist}</span>",unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  ENERGY / SUSTAINABILITY
+# ══════════════════════════════════════════════════════════════════════════════
+if ":material/bolt:" in page:
+    st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Energy / Sustainability Manager</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Scope 1 & 2 emissions · 2030 reduction pathway · ESG reporting — Alcoa Australia</p>",unsafe_allow_html=True)
+    months=["Jan","Feb","Mar","Apr","May","Jun"]
+    s1m=[1820,1740,1890,1810,1960,1840]; s1c=[4200,4050,4380,4190,4420,4280]
+    s2e=[2100,2080,2140,2090,2160,2110]; s2r=[380,365,392,378,401,385]
+    tgt=[round(9500-i*120) for i in range(6)]
+    tot=[s1m[i]+s1c[i]+s2e[i]+s2r[i] for i in range(6)]
+    mtd=tot[5]; vs30=round((mtd-tgt[5])/tgt[5]*100)
+    _metrics(
+        ("Total Scope 1+2 MTD",f"{mtd/1000:.1f}kt CO₂e",f"{'▲ +' if vs30>0 else '▼ '}{abs(vs30)}% vs 2030 target path"),
+        ("Mine diesel (Scope 1)",f"{s1m[5]}t CO₂e","Haul fleet + plant"),
+        ("Calciner gas (Scope 1)",f"{s1c[5]}t CO₂e","Largest single source (49%)"),
+        ("Grid electricity (Sc2)",f"{s2e[5]}t CO₂e","Refinery + conveyor"),
+        ("Rail transport (Sc2)",f"{s2r[5]}t CO₂e","Pinjarra/Wagerup → Bunbury"),
+        ("Reporting cycle saved","85%","3 weeks → 2-3 days (CoCo)"),
+    )
+    c1,c2=st.columns(2)
+    with c1:
+        fig=go.Figure()
+        for ys,nm,col in [(s1m,"Mine diesel",AMBER),(s1c,"Calciner gas",RED),(s2e,"Grid electricity",CYAN),(s2r,"Rail transport",BLUE)]:
+            fig.add_trace(go.Bar(name=nm,x=months,y=ys,marker_color=col,opacity=0.9))
+        fig.add_trace(go.Scatter(name="2030 target pathway",x=months,y=tgt,mode="lines+markers",
+                                  line=dict(color=GREEN,width=2,dash="dash"),marker=dict(size=6)))
+        fig.update_layout(**CHART_LAYOUT,barmode="stack",height=280,title=dict(text="Monthly Scope 1+2 emissions vs 2030 target (t CO₂e)",font=dict(color=TXT,size=13)),
+                          xaxis=_ax(False),yaxis=_ax(),legend=dict(font=dict(color=TXT,size=10),bgcolor="rgba(0,0,0,0)"))
+        st.plotly_chart(fig,use_container_width=True,config=dict(displayModeBar=False))
+    with c2:
+        fig2=go.Figure(go.Pie(labels=["Calciner gas (S1)","Grid electricity (S2)","Mine diesel (S1)","Rail transport (S2)"],
+                               values=[s1c[5],s2e[5],s1m[5],s2r[5]],
+                               marker_colors=[RED,CYAN,AMBER,BLUE],hole=0.4,
+                               textinfo="percent+label",textfont=dict(color=TXT,size=10)))
+        fig2.update_layout(**CHART_LAYOUT,height=280,title=dict(text="Emissions breakdown — June MTD",font=dict(color=TXT,size=13)),showlegend=False)
+        st.plotly_chart(fig2,use_container_width=True,config=dict(displayModeBar=False))
+    with st.container(border=True):
+        st.markdown("**🎯 Top 3 reduction opportunities**")
+        for rank,action,saving,effort,timeline,cost in [
+            (1,"Calciner fuel switch — natural gas to green hydrogen blend (20%)","−856t CO₂e/month","High","2027","$12M capex"),
+            (2,"Haul fleet electrification — pilot 3× electric haul trucks at Huntly","−320t CO₂e/month","Medium","2026","$8M"),
+            (3,"Solar PV + battery at Pinjarra refinery (10 MW)","−185t CO₂e/month","Low","2025","$14M"),
+        ]:
+            with st.container(border=True):
+                ca,cb,cc=st.columns([0.3,6,1.5])
+                ca.markdown(f"**{rank}**")
+                cb.markdown(f"**{action}**")
+                cc.markdown(f"<span style='color:{GREEN};font-weight:700;'>{saving}</span>",unsafe_allow_html=True)
+                st.caption(f"Effort: {effort} · Timeline: {timeline} · Investment: {cost}")
