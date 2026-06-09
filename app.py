@@ -871,6 +871,19 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+def _srng2(seed):
+    s = [seed | 0]
+    def _r():
+        s[0] = (s[0] ^ (s[0] >> 15)) * (1 | s[0]) & 0xFFFFFFFF
+        s[0] = (s[0] ^ (s[0] + (s[0] ^ (s[0] >> 7)) * 61)) & 0xFFFFFFFF
+        return ((s[0] ^ (s[0] >> 14)) & 0xFFFFFFFF) / 4294967296
+    return _r
+
+def _metrics(*items):
+    cols = st.columns(len(items))
+    for col, (label, value, delta) in zip(cols, items):
+        col.metric(label, value, delta, border=True)
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  PAGE 1 — OPERATIONS DASHBOARD
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1857,22 +1870,6 @@ elif "Train tracker" in page:
                 st.markdown(f"<div style='font-size:0.78rem;color:#94A3B8;line-height:1.9;'>📦 {t['payload']:,} t<br>⚡ {t['speed']} km/h · {t['wagons']} wagons<br>⏱ ETA: {eta_str}<br>💧 {t['moisture']}% {moist_flag}</div>", unsafe_allow_html=True)
 
     st.caption("⏱ Auto-refreshes every 30s · Port of Bunbury: 3×50,000t storage bins · ~6 Mtpa annual throughput")
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  PERSONA DASHBOARD HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
-def _srng2(seed):
-    s = [seed | 0]
-    def _r():
-        s[0] = (s[0] ^ (s[0] >> 15)) * (1 | s[0]) & 0xFFFFFFFF
-        s[0] = (s[0] ^ (s[0] + (s[0] ^ (s[0] >> 7)) * 61)) & 0xFFFFFFFF
-        return ((s[0] ^ (s[0] >> 14)) & 0xFFFFFFFF) / 4294967296
-    return _r
-
-def _metrics(*items):
-    cols = st.columns(len(items))
-    for col, (label, value, delta) in zip(cols, items):
-        col.metric(label, value, delta, border=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  PRODUCTION SUPERINTENDENT
