@@ -1825,36 +1825,45 @@ elif "Train tracker" in page:
     c5.metric("Wagerup trains",     sum(1 for t in trains if t["route"]=="wagerup"),  border=True)
     c6.metric("Annual throughput",  "~6 Mtpa",   border=True)
 
-    esri = [dict(below="traces", sourcetype="raster",
-                 sourceattribution="Esri | National Geographic",
-                 source=["https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}"])]
     fig = go.Figure()
     for rid, rd in ROUTES_T.items():
-        fig.add_trace(go.Scattermapbox(
+        fig.add_trace(go.Scattergeo(
             lat=[rd["oLat"],rd["dLat"]], lon=[rd["oLon"],rd["dLon"]],
-            mode="lines", line=dict(width=2.5,color=rd["color"]), opacity=0.45,
+            mode="lines", line=dict(width=3,color=rd["color"]), opacity=0.7,
             hoverinfo="skip", showlegend=False))
-    for name, lat, lon, sym in [
+    for name, lat, lon, col in [
         ("Pinjarra Refinery",PINJARRA_LAT,PINJARRA_LON,CYAN),
         ("Wagerup Refinery",WAGERUP_LAT,WAGERUP_LON,AMBER),
         ("Port of Bunbury",PORT_LAT,PORT_LON,GREEN)
     ]:
-        fig.add_trace(go.Scattermapbox(
+        fig.add_trace(go.Scattergeo(
             lat=[lat], lon=[lon], mode="markers+text",
-            marker=dict(size=18,color=sym),
-            text=["⚓" if "Port" in name else "🏭"],
+            marker=dict(size=14,color=col,symbol="circle"),
+            text=["⚓ Port of Bunbury" if "Port" in name else f"🏭 {name.split()[0]}"],
+            textposition="top right",
+            textfont=dict(size=10,color="white"),
             hovertemplate=f"<b>{name}</b><extra></extra>",
-            textfont=dict(size=11,color="white"), showlegend=False))
+            showlegend=False))
     for rid, rd in ROUTES_T.items():
         rt = [t for t in trains if t["route"]==rid]
-        fig.add_trace(go.Scattermapbox(
-            lat=[t["lat"] for t in rt], lon=[t["lon"] for t in rt],
-            mode="markers", name=rd["label"],
-            marker=dict(size=16,color=[STATUS_TC[t["status"]] for t in rt],opacity=0.95),
-            customdata=[[t["id"],t["status"],t["speed"],t["payload"],t["eta"],t["wagons"]] for t in rt],
-            hovertemplate="<b>🚂 %{customdata[0]}</b><br>Status: %{customdata[1]}<br>Speed: %{customdata[2]} km/h<br>Payload: %{customdata[3]} t<br>ETA: %{customdata[4]} min<extra></extra>"))
+        if rt:
+            fig.add_trace(go.Scattergeo(
+                lat=[t["lat"] for t in rt], lon=[t["lon"] for t in rt],
+                mode="markers", name=rd["label"],
+                marker=dict(size=12,color=[STATUS_TC[t["status"]] for t in rt],opacity=0.95,symbol="circle"),
+                customdata=[[t["id"],t["status"],t["speed"],t["payload"],t["eta"],t["wagons"]] for t in rt],
+                hovertemplate="<b>🚂 %{customdata[0]}</b><br>Status: %{customdata[1]}<br>Speed: %{customdata[2]} km/h<br>Payload: %{customdata[3]} t<br>ETA: %{customdata[4]} min<extra></extra>"))
     fig.update_layout(**CHART_LAYOUT, height=460,
-                      mapbox=dict(style="white-bg", center=dict(lat=-33.1,lon=115.76), zoom=8.5),
+                      geo=dict(
+                          showland=True,      landcolor="#1B3A28",
+                          showocean=True,     oceancolor="#0D2645",
+                          showcoastlines=True, coastlinecolor="rgba(255,255,255,0.4)",
+                          showrivers=False,   showlakes=False,
+                          showframe=False,    bgcolor="rgba(0,0,0,0)",
+                          projection_type="mercator",
+                          lataxis_range=[-34.2,-32.0],
+                          lonaxis_range=[114.8,116.8],
+                      ),
                       legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(13,33,55,0.85)"))
     st.plotly_chart(fig, use_container_width=True, config=dict(scrollZoom=True))
 
