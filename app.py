@@ -1855,7 +1855,6 @@ elif "Train tracker" in page:
             hovertemplate="<b>🚂 %{customdata[0]}</b><br>Status: %{customdata[1]}<br>Speed: %{customdata[2]} km/h<br>Payload: %{customdata[3]} t<br>ETA: %{customdata[4]} min<extra></extra>"))
     fig.update_layout(**CHART_LAYOUT, height=460,
                       mapbox=dict(style="white-bg", center=dict(lat=-33.1,lon=115.76), zoom=8.5),
-                      margin=dict(l=0,r=0,t=0,b=0),
                       legend=dict(font=dict(color=TXT,size=11),bgcolor="rgba(13,33,55,0.85)"))
     st.plotly_chart(fig, use_container_width=True, config=dict(scrollZoom=True))
 
