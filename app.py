@@ -825,51 +825,41 @@ with st.sidebar:
     <hr style="border-color:rgba(255,255,255,0.18); margin:0 0 16px 0;">
     """, unsafe_allow_html=True)
 
-    st.markdown("<div style='font-size:0.62rem;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,0.35);text-transform:uppercase;padding:2px 4px 2px 4px;'>Operations</div>", unsafe_allow_html=True)
+    st.markdown("""
+<style>
+[data-testid="stRadio"] label { font-size: 0.82rem !important; }
+</style>
+<div style='font-size:0.6rem;font-weight:700;letter-spacing:1.2px;color:rgba(255,255,255,0.35);text-transform:uppercase;padding:4px 8px 2px;'>Operations</div>
+""", unsafe_allow_html=True)
+
     page = st.radio(
         "nav",
         [
-            ":material/dashboard: Operations dashboard",
-            ":material/science: Process simulator",
+            "📊 Operations dashboard",
+            "🔬 Process simulator",
+            "📍 Vehicle tracker",
+            "🚂 Train tracker",
+            "🚢 Ship tracker",
+            "📋 Production Superintendent",
+            "🗺️ Mine Planning Engineer",
+            "⚗️ Process / Met Engineer",
+            "🪨 Geologist",
+            "🚛 Maintenance — Mobile Fleet",
+            "🔧 Reliability Engineer",
+            "📦 Supply Chain Planner",
+            "⚓ Train / Port Coordinator",
+            "🛒 Procurement / Warehouse",
+            "🌿 Environmental Advisor",
+            "🛡️ Safety / HSE Manager",
+            "⚡ Energy / Sustainability",
         ],
         label_visibility="collapsed",
-    )
-    st.markdown("<div style='font-size:0.62rem;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,0.35);text-transform:uppercase;padding:6px 4px 2px 4px;'>Logistics</div>", unsafe_allow_html=True)
-    page_log = st.radio(
-        "nav_log",
-        [
-            ":material/gps_fixed: Vehicle tracker",
-            ":material/train: Train tracker",
-            ":material/directions_boat: Ship tracker",
+        captions=[
+            "","",
+            "──── Logistics ────","","",
+            "──── Persona Dashboards ────","","","","","","","","","","","",
         ],
-        label_visibility="collapsed",
     )
-    st.markdown("<div style='font-size:0.62rem;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,0.35);text-transform:uppercase;padding:6px 4px 2px 4px;'>Persona Dashboards</div>", unsafe_allow_html=True)
-    page_persona = st.radio(
-        "nav_persona",
-        [
-            ":material/clipboard_list: Production Superintendent",
-            ":material/map: Mine Planning Engineer",
-            ":material/biotech: Process / Met Engineer",
-            ":material/terrain: Geologist",
-            ":material/local_shipping: Maintenance — Mobile Fleet",
-            ":material/build: Reliability Engineer",
-            ":material/inventory_2: Supply Chain Planner",
-            ":material/anchor: Train / Port Coordinator",
-            ":material/shopping_cart: Procurement / Warehouse",
-            ":material/eco: Environmental Advisor",
-            ":material/security: Safety / HSE Manager",
-            ":material/bolt: Energy / Sustainability",
-        ],
-        label_visibility="collapsed",
-        index=None,
-    )
-    if page_log:
-        page = page_log
-        page_persona = None
-    if page_persona:
-        page = page_persona
-        page_log = None
 
     st.markdown("<hr style='border-color:rgba(255,255,255,0.18); margin:16px 0;'>", unsafe_allow_html=True)
     now = datetime.now()
@@ -884,7 +874,7 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════════════════════════════
 #  PAGE 1 — OPERATIONS DASHBOARD
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/dashboard:" in page:
+if "Operations dashboard" in page:
 
     st.markdown(
         "<h1 style='margin:0; font-size:1.75rem;'>Operations Dashboard</h1>"
@@ -1099,7 +1089,7 @@ if ":material/dashboard:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  PAGE 2 — PROCESS SIMULATOR
 # ══════════════════════════════════════════════════════════════════════════════
-elif ":material/science:" in page:
+elif "Process simulator" in page:
     st.markdown(
         "<h1 style='margin:0; font-size:1.75rem;'>Process Simulator</h1>"
         "<p style='color:#94A3B8; margin:0 0 20px 0;'>Adjust operational parameters and observe cascading effects across the processing chain</p>",
@@ -1359,7 +1349,7 @@ elif ":material/science:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  PAGE 3 — VEHICLE TRACKER
 # ══════════════════════════════════════════════════════════════════════════════
-elif ":material/gps_fixed:" in page:
+elif "Vehicle tracker" in page:
     st.markdown(
         "<h1 style='margin:0; font-size:1.75rem;'>Vehicle Tracker</h1>"
         "<p style='color:#94A3B8; margin:0 0 16px 0;'>Live equipment positions across the Huntly Mine — Darling Range, Western Australia</p>",
@@ -1532,7 +1522,7 @@ elif ":material/gps_fixed:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  PAGE 4 — SHIP TRACKER
 # ══════════════════════════════════════════════════════════════════════════════
-elif ":material/directions_boat:" in page:
+elif "Ship tracker" in page:
     st.markdown(
         "<h1 style='margin:0; font-size:1.75rem;'>Ship Tracker</h1>"
         "<p style='color:#94A3B8; margin:0 0 16px 0;'>Inbound and outbound vessels for the Alcoa alumina export fleet — Kwinana Bulk Terminal, WA</p>",
@@ -1764,7 +1754,7 @@ elif ":material/directions_boat:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  PAGE 5 — TRAIN TRACKER
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/train:" in page:
+if "Train tracker" in page:
     PINJARRA_LAT, PINJARRA_LON = -32.524, 115.963
     WAGERUP_LAT,  WAGERUP_LON  = -33.304, 115.897
     PORT_LAT,     PORT_LON     = -33.327, 115.637
@@ -1887,7 +1877,7 @@ def _metrics(*items):
 # ══════════════════════════════════════════════════════════════════════════════
 #  PRODUCTION SUPERINTENDENT
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/clipboard_list:" in page:
+if "Production Superintendent" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Production Superintendent</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Morning briefing — overnight shift summary · Huntly Mine</p>", unsafe_allow_html=True)
     r = _srng2(77)
     now = datetime.now()
@@ -1956,7 +1946,7 @@ if ":material/clipboard_list:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  MINE PLANNING ENGINEER
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/map:" in page:
+if "Mine Planning Engineer" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Mine Planning Engineer</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Weekly mine plan · Block selection · Equipment availability — Huntly Mine</p>",unsafe_allow_html=True)
     BLOCKS=[
         dict(id="B-42A",al2o3=38.2,rsi=2.1,dist=0.8,area=4.2,status="Cleared", equip="Available",approved=True),
@@ -2015,7 +2005,7 @@ if ":material/map:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  PROCESS / MET ENGINEER
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/biotech:" in page:
+if "Process / Met Engineer" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Process / Metallurgical Engineer</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Bayer Process optimisation — ore grade correlation · LIMS vs DCS historian · Digestion parameters</p>",unsafe_allow_html=True)
     r=_srng2(55); now=datetime.now()
     hrs24=[now-timedelta(hours=23-i) for i in range(24)]
@@ -2073,7 +2063,7 @@ if ":material/biotech:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  GEOLOGIST
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/terrain:" in page:
+if "Geologist" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Geologist / Resource Modeller</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Block model grade reconciliation · F1/F2/F3 accuracy · Mine-to-mill tracking — Huntly Mine</p>",unsafe_allow_html=True)
     GBLOCKS=[
         dict(id="B-42A",pred=38.4,bh=38.2,crush=37.8,ref=37.1,pred_rsi=2.0,bh_rsi=2.1,f1=0.995,f2=0.983,f3=0.967),
@@ -2139,7 +2129,7 @@ if ":material/terrain:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  MAINTENANCE — MOBILE FLEET
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/local_shipping:" in page:
+if "Maintenance" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Maintenance Supervisor — Mobile Fleet</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Haul trucks · Excavators · Drill rigs · Preventive maintenance scheduling — Huntly Mine</p>",unsafe_allow_html=True)
     FLEET=[
         dict(id="T-01",tp="Haul Truck",hrs=482,iv=500,oil="Pass",vib="Normal",status="Monitor",next=3),
@@ -2199,7 +2189,7 @@ if ":material/local_shipping:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  RELIABILITY ENGINEER
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/build:" in page:
+if "Reliability Engineer" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Reliability Engineer</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Asset health · Vibration trending · Predictive maintenance — Huntly & Pinjarra</p>",unsafe_allow_html=True)
     def _gvib(seed,base,drift):
         rng=_srng2(seed); v=[base]
@@ -2268,7 +2258,7 @@ if ":material/build:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  SUPPLY CHAIN PLANNER
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/inventory_2:" in page:
+if "Supply Chain Planner" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Supply Chain / Logistics Planner</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Refinery output · Rail schedule · Port stockpile · Vessel schedule · Demurrage risk — Bunbury</p>",unsafe_allow_html=True)
     r=_srng2(33); now=datetime.now()
     days7=[(now-timedelta(days=6-i)).strftime("%a") for i in range(7)]
@@ -2323,7 +2313,7 @@ if ":material/inventory_2:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  TRAIN / PORT COORDINATOR
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/anchor:" in page:
+if "Train / Port Coordinator" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Train / Port Loadout Coordinator</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Silo levels · Rail dispatch · Port stockpile · 48-hour schedule — Pinjarra, Wagerup & Bunbury</p>",unsafe_allow_html=True)
     r=_srng2(88); now=datetime.now()
     hrs48=[now-timedelta(hours=47-i) for i in range(48)]
@@ -2383,7 +2373,7 @@ if ":material/anchor:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  PROCUREMENT / WAREHOUSE
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/shopping_cart:" in page:
+if "Procurement" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Procurement / Warehouse Manager</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Critical spares · Predictive reorder · Wear-based consumption · Supplier lead times</p>",unsafe_allow_html=True)
     SPARES=[
         dict(part="Jaw crusher liner set",        stock=1,mn=2,lead=14,wear=91,  reorder="Overdue",  cost=28000,status="Order now"),
@@ -2444,7 +2434,7 @@ if ":material/shopping_cart:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  ENVIRONMENTAL ADVISOR
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/eco:" in page:
+if "Environmental Advisor" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Environmental Advisor</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>EPA licence compliance · Dust, noise, water, rehabilitation — Huntly Mine, WA</p>",unsafe_allow_html=True)
     r=_srng2(11); now=datetime.now()
     hrs24=[now-timedelta(hours=23-i) for i in range(24)]
@@ -2527,7 +2517,7 @@ if ":material/eco:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  SAFETY / HSE MANAGER
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/security:" in page:
+if "Safety" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Safety / HSE Manager</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Incident tracking · Fatigue management · Proximity alerts · Training compliance — Huntly Mine</p>",unsafe_allow_html=True)
     months=["Jan","Feb","Mar","Apr","May","Jun"]
     inc_m=[1,0,2,1,0,1]; nm_m=[3,2,4,2,1,3]; dl=[1,0,3,1,0,0]
@@ -2608,7 +2598,7 @@ if ":material/security:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  ENERGY / SUSTAINABILITY
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/bolt:" in page:
+if "Energy" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Energy / Sustainability Manager</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Scope 1 & 2 emissions · 2030 reduction pathway · ESG reporting — Alcoa Australia</p>",unsafe_allow_html=True)
     months=["Jan","Feb","Mar","Apr","May","Jun"]
     s1m=[1820,1740,1890,1810,1960,1840]; s1c=[4200,4050,4380,4190,4420,4280]
@@ -2659,7 +2649,7 @@ if ":material/bolt:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  PAGE 5 — TRAIN TRACKER
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/train:" in page:
+if "Train tracker" in page:
     PINJARRA_LAT, PINJARRA_LON = -32.524, 115.963
     WAGERUP_LAT,  WAGERUP_LON  = -33.304, 115.897
     PORT_LAT,     PORT_LON     = -33.327, 115.637
@@ -2782,7 +2772,7 @@ def _metrics(*items):
 # ══════════════════════════════════════════════════════════════════════════════
 #  PRODUCTION SUPERINTENDENT
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/clipboard_list:" in page:
+if "Production Superintendent" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Production Superintendent</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Morning briefing — overnight shift summary · Huntly Mine</p>", unsafe_allow_html=True)
     r = _srng2(77)
     now = datetime.now()
@@ -2851,7 +2841,7 @@ if ":material/clipboard_list:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  MINE PLANNING ENGINEER
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/map:" in page:
+if "Mine Planning Engineer" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Mine Planning Engineer</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Weekly mine plan · Block selection · Equipment availability — Huntly Mine</p>",unsafe_allow_html=True)
     BLOCKS=[
         dict(id="B-42A",al2o3=38.2,rsi=2.1,dist=0.8,area=4.2,status="Cleared", equip="Available",approved=True),
@@ -2910,7 +2900,7 @@ if ":material/map:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  PROCESS / MET ENGINEER
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/biotech:" in page:
+if "Process / Met Engineer" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Process / Metallurgical Engineer</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Bayer Process optimisation — ore grade correlation · LIMS vs DCS historian · Digestion parameters</p>",unsafe_allow_html=True)
     r=_srng2(55); now=datetime.now()
     hrs24=[now-timedelta(hours=23-i) for i in range(24)]
@@ -2968,7 +2958,7 @@ if ":material/biotech:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  GEOLOGIST
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/terrain:" in page:
+if "Geologist" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Geologist / Resource Modeller</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Block model grade reconciliation · F1/F2/F3 accuracy · Mine-to-mill tracking — Huntly Mine</p>",unsafe_allow_html=True)
     GBLOCKS=[
         dict(id="B-42A",pred=38.4,bh=38.2,crush=37.8,ref=37.1,pred_rsi=2.0,bh_rsi=2.1,f1=0.995,f2=0.983,f3=0.967),
@@ -3034,7 +3024,7 @@ if ":material/terrain:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  MAINTENANCE — MOBILE FLEET
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/local_shipping:" in page:
+if "Maintenance" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Maintenance Supervisor — Mobile Fleet</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Haul trucks · Excavators · Drill rigs · Preventive maintenance scheduling — Huntly Mine</p>",unsafe_allow_html=True)
     FLEET=[
         dict(id="T-01",tp="Haul Truck",hrs=482,iv=500,oil="Pass",vib="Normal",status="Monitor",next=3),
@@ -3094,7 +3084,7 @@ if ":material/local_shipping:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  RELIABILITY ENGINEER
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/build:" in page:
+if "Reliability Engineer" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Reliability Engineer</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Asset health · Vibration trending · Predictive maintenance — Huntly & Pinjarra</p>",unsafe_allow_html=True)
     def _gvib(seed,base,drift):
         rng=_srng2(seed); v=[base]
@@ -3163,7 +3153,7 @@ if ":material/build:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  SUPPLY CHAIN PLANNER
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/inventory_2:" in page:
+if "Supply Chain Planner" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Supply Chain / Logistics Planner</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Refinery output · Rail schedule · Port stockpile · Vessel schedule · Demurrage risk — Bunbury</p>",unsafe_allow_html=True)
     r=_srng2(33); now=datetime.now()
     days7=[(now-timedelta(days=6-i)).strftime("%a") for i in range(7)]
@@ -3219,7 +3209,7 @@ if ":material/inventory_2:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  TRAIN / PORT COORDINATOR
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/anchor:" in page:
+if "Train / Port Coordinator" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Train / Port Loadout Coordinator</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Silo levels · Rail dispatch · Port stockpile · 48-hour schedule — Pinjarra, Wagerup & Bunbury</p>",unsafe_allow_html=True)
     r=_srng2(88); now=datetime.now()
     hrs48=[now-timedelta(hours=47-i) for i in range(48)]
@@ -3279,7 +3269,7 @@ if ":material/anchor:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  PROCUREMENT / WAREHOUSE
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/shopping_cart:" in page:
+if "Procurement" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Procurement / Warehouse Manager</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Critical spares · Predictive reorder · Wear-based consumption · Supplier lead times</p>",unsafe_allow_html=True)
     SPARES=[
         dict(part="Jaw crusher liner set",        stock=1,mn=2,lead=14,wear=91,  reorder="Overdue",  cost=28000,status="Order now"),
@@ -3340,7 +3330,7 @@ if ":material/shopping_cart:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  ENVIRONMENTAL ADVISOR
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/eco:" in page:
+if "Environmental Advisor" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Environmental Advisor</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>EPA licence compliance · Dust, noise, water, rehabilitation — Huntly Mine, WA</p>",unsafe_allow_html=True)
     r=_srng2(11); now=datetime.now()
     hrs24=[now-timedelta(hours=23-i) for i in range(24)]
@@ -3423,7 +3413,7 @@ if ":material/eco:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  SAFETY / HSE MANAGER
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/security:" in page:
+if "Safety" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Safety / HSE Manager</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Incident tracking · Fatigue management · Proximity alerts · Training compliance — Huntly Mine</p>",unsafe_allow_html=True)
     months=["Jan","Feb","Mar","Apr","May","Jun"]
     inc_m=[1,0,2,1,0,1]; nm_m=[3,2,4,2,1,3]; dl=[1,0,3,1,0,0]
@@ -3504,7 +3494,7 @@ if ":material/security:" in page:
 # ══════════════════════════════════════════════════════════════════════════════
 #  ENERGY / SUSTAINABILITY
 # ══════════════════════════════════════════════════════════════════════════════
-if ":material/bolt:" in page:
+if "Energy" in page:
     st.markdown("<h1 style='margin:0;font-size:1.75rem;'>Energy / Sustainability Manager</h1><p style='color:#94A3B8;margin:0 0 20px 0;'>Scope 1 & 2 emissions · 2030 reduction pathway · ESG reporting — Alcoa Australia</p>",unsafe_allow_html=True)
     months=["Jan","Feb","Mar","Apr","May","Jun"]
     s1m=[1820,1740,1890,1810,1960,1840]; s1c=[4200,4050,4380,4190,4420,4280]
